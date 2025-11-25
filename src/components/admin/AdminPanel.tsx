@@ -14,7 +14,7 @@ export const AdminPanel: React.FC = () => {
         pair: 'BTC/USDT',
         type: 'buy',
         scheduled_time: '',
-        timeframe: 5
+        timeframe: 1
     });
 
     useEffect(() => {
@@ -192,8 +192,6 @@ export const AdminPanel: React.FC = () => {
                                 className="w-full p-2 rounded bg-white/5 border border-white/10 text-white"
                             >
                                 <option value={1} className="bg-gray-900 text-white">1 Minuto</option>
-                                <option value={5} className="bg-gray-900 text-white">5 Minutos</option>
-                                <option value={15} className="bg-gray-900 text-white">15 Minutos</option>
                             </select>
                         </div>
                         <div className="md:col-span-2">
