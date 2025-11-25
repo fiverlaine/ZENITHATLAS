@@ -15,7 +15,7 @@ export const SimpleHeader: React.FC<Props> = ({ onShowLearn }) => {
   };
 
   return (
-    <header className="bg-bg-sidebar/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50">
+    <header className="bg-bg-sidebar/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 md:ml-64 transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}

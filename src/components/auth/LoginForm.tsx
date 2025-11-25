@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Loader2, Cpu } from 'lucide-react';
+import { Mail, Cpu } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../ui/Button';
 import { TermsDialog } from '../auth/TermsDialog';
@@ -27,7 +27,7 @@ export const LoginForm: React.FC = () => {
       if (response.success) {
         setView('learn');
       } else {
-        setError(response.error);
+        setError(response.error || 'Erro desconhecido');
       }
     } catch (err) {
       setError('Erro ao fazer login. Tente novamente.');
@@ -55,7 +55,7 @@ export const LoginForm: React.FC = () => {
 
           <div className="space-y-2">
             <h1 className="text-4xl font-bold tracking-tight text-white">
-              QUANTUM<span className="text-primary">TRADE</span>
+              ZENITH<span className="text-primary">ATLAS</span>
             </h1>
             <p className="text-gray-400">
               Plataforma inteligente de análise e sinais para trading
