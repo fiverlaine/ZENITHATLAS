@@ -42,8 +42,27 @@ export const useMarketData = (symbol: string, timeframe: number) => {
     fetchData();
     const interval = setInterval(fetchData, 5000);
 
+    // Listener para quando a aba volta a ficar ativa
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Tab became visible, refreshing data');
+        fetchData();
+      }
+    };
+
+    // Listener para foco da janela
+    const handleFocus = () => {
+      console.log('Window focused, refreshing data');
+      fetchData();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
       if (abortController.current) {
         abortController.current.abort();
       }

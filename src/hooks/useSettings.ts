@@ -35,7 +35,7 @@ const profiles = {
 export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
-      settings: null,
+      settings: defaultSettings, // Sempre inicia com valores padrão
       setSettings: (settings) => set({ settings })
     }),
     {
@@ -44,7 +44,7 @@ export const useSettings = create<SettingsState>()(
       migrate: (persistedState: any, version: number) => {
         if (version === 0 || !persistedState || !persistedState.settings) {
           return {
-            settings: null
+            settings: defaultSettings
           };
         }
 

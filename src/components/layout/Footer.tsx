@@ -10,7 +10,7 @@ export const Footer: React.FC = () => {
           <p>Trading envolve alto risco. Opere com responsabilidade.</p>
         </div>
         <div className="text-center text-xs text-gray-500">
-          <p>© 2024 QuantumTrade. Todos os direitos reservados.</p>
+          <p>© 2024 ZENITHATLAS. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

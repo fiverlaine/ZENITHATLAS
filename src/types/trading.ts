@@ -8,7 +8,7 @@ export interface Signal {
   pair: string;
   confidence: number;
   result?: 'win' | 'loss';
-  profitLoss?: number;
+  profit_loss?: number;
   timeframe: number;
 }
 

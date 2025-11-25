@@ -33,7 +33,7 @@ export const fetchMarketData = async (symbol: string, timeframe: number) => {
     }
 
     const [base, quote] = symbol.split('/');
-    
+
     if (!base || !quote) {
       throw new Error('Par de trading inválido');
     }
@@ -44,7 +44,7 @@ export const fetchMarketData = async (symbol: string, timeframe: number) => {
         params: {
           fsym: base,
           tsym: quote,
-          limit: 100,
+          limit: 300, // Aumentado para suportar EMA 200
           aggregate: timeframe
         }
       });
@@ -60,7 +60,7 @@ export const fetchMarketData = async (symbol: string, timeframe: number) => {
     const response = await retryRequest(makeRequest);
 
     const data = response.data?.Data?.Data;
-    
+
     if (!data || !Array.isArray(data)) {
       throw new Error('Dados de mercado indisponíveis');
     }
@@ -115,12 +115,12 @@ export const fetchMarketData = async (symbol: string, timeframe: number) => {
     if (error.response?.data?.Message) {
       throw new Error(`Erro da API: ${error.response.data.Message}`);
     }
-    
+
     // Propaga o erro original se já for uma mensagem de erro personalizada
     if (error instanceof Error) {
       throw error;
     }
-    
+
     throw new Error('Erro ao buscar dados do mercado. Tentando novamente...');
   }
 };

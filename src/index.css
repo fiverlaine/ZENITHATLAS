@@ -1,32 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-black text-gray-100 antialiased;
+    @apply bg-bg-body text-gray-100 antialiased font-sans;
   }
 }
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-xl font-medium duration-200 ease-in-out flex items-center justify-center gap-2;
+    @apply px-4 py-2 rounded-xl font-medium duration-200 ease-in-out flex items-center justify-center gap-2 transition-all;
   }
 
   .btn-primary {
-    @apply bg-green-500 text-white hover:bg-green-600 active:scale-[0.98] disabled:opacity-50 disabled:hover:bg-green-500 disabled:cursor-not-allowed;
+    @apply bg-primary text-black hover:bg-primary-hover hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 disabled:hover:bg-primary disabled:cursor-not-allowed disabled:transform-none;
+    box-shadow: 0 4px 14px 0 rgba(97, 248, 0, 0.2);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 6px 20px 0 rgba(97, 248, 0, 0.3);
+  }
+
+  .btn-primary:disabled {
+    box-shadow: none;
   }
 
   .btn-secondary {
-    @apply bg-gray-800 text-gray-400 hover:bg-gray-700 active:scale-[0.98] disabled:opacity-50 disabled:hover:bg-gray-800 disabled:cursor-not-allowed;
+    @apply bg-white/5 text-white border border-gray-800 hover:bg-white/10 hover:border-white active:scale-[0.98] disabled:opacity-50 disabled:hover:bg-white/5 disabled:cursor-not-allowed;
   }
 
   .btn-danger {
-    @apply bg-red-500 text-white hover:bg-red-600 active:scale-[0.98] disabled:opacity-50 disabled:hover:bg-red-500 disabled:cursor-not-allowed;
+    @apply bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .card {
-    @apply bg-gray-900/50 border border-gray-800 rounded-xl p-6 transition-colors hover:border-green-500/30;
+    @apply bg-bg-card border border-gray-800 rounded-xl p-6 transition-all hover:border-primary/50;
+  }
+
+  .card:hover {
+    box-shadow: 0 10px 30px -10px rgba(97, 248, 0, 0.1);
   }
 }
 
@@ -36,15 +51,15 @@
   }
 
   .scrollbar-track {
-    @apply bg-gray-900;
+    @apply bg-bg-sidebar;
   }
 
   .scrollbar-thumb {
-    @apply bg-green-500 rounded-full hover:bg-green-600;
+    @apply bg-primary rounded-full hover:bg-primary-hover;
   }
 
   .glass {
-    @apply bg-gray-900/50 backdrop-blur-sm;
+    @apply bg-[#111111]/80 backdrop-blur-xl border border-primary/20;
   }
 
   .animate-fade-in {
@@ -57,6 +72,7 @@
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

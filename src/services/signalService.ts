@@ -3,10 +3,14 @@ import { Signal } from '../types/trading';
 import { retry } from '../utils/retryUtils';
 
 export const signalService = {
-  async createSignal(signal: Omit<Signal, 'id' | 'result' | 'profitLoss'>) {
+  async createSignal(signal: Omit<Signal, 'result' | 'profit_loss'> & {
+    id?: string;
+    martingaleStep?: number;
+    martingaleMultiplier?: number;
+  }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -60,11 +64,11 @@ export const signalService = {
           console.error('Database error:', error);
           throw error; // This will trigger retry
         }
-        
+
         if (!data) {
           throw new Error('No data returned from signal creation');
         }
-        
+
         return {
           ...signal,
           id: data.id,
@@ -82,7 +86,7 @@ export const signalService = {
   async getPendingSignals(): Promise<Signal[]> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         return [];
       }
@@ -103,15 +107,15 @@ export const signalService = {
       return (data || []).map(signal => ({
         id: signal.id,
         type: signal.type as 'buy' | 'sell',
-        price: signal.price,
-        pair: signal.pair,
-        confidence: signal.confidence,
+        price: Number(signal.price) || 0,
+        pair: signal.pair || '',
+        confidence: Number(signal.confidence) || 0,
         result: signal.result as 'win' | 'loss' | undefined,
-        profitLoss: signal.profit_loss,
-        time: signal.time,
-        timeframe: signal.timeframe,
-        martingaleStep: signal.martingale_step,
-        martingaleMultiplier: signal.martingale_multiplier
+        profit_loss: Number(signal.profit_loss) || 0,
+        time: signal.time || new Date().toISOString(),
+        timeframe: Number(signal.timeframe) || 1,
+        martingaleStep: Number(signal.martingale_step) || 0,
+        martingaleMultiplier: Number(signal.martingale_multiplier) || 1.0
       }));
     } catch (error) {
       console.error('Error loading pending signals:', error);
@@ -122,7 +126,7 @@ export const signalService = {
   async getAllSignals(): Promise<Signal[] | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         console.warn('User not authenticated when fetching all signals');
         return null;
@@ -142,15 +146,15 @@ export const signalService = {
       return data.map(signal => ({
         id: signal.id,
         type: signal.type as 'buy' | 'sell',
-        price: Number(signal.price),
-        pair: signal.pair,
-        confidence: Number(signal.confidence),
+        price: Number(signal.price) || 0,
+        pair: signal.pair || '',
+        confidence: Number(signal.confidence) || 0,
         result: signal.result as 'win' | 'loss' | undefined,
-        profitLoss: signal.profit_loss,
-        time: signal.time,
-        timeframe: signal.timeframe,
-        martingaleStep: signal.martingale_step,
-        martingaleMultiplier: signal.martingale_multiplier
+        profit_loss: Number(signal.profit_loss) || 0,
+        time: signal.time || new Date().toISOString(),
+        timeframe: Number(signal.timeframe) || 1,
+        martingaleStep: Number(signal.martingale_step) || 0,
+        martingaleMultiplier: Number(signal.martingale_multiplier) || 1.0
       }));
     } catch (error) {
       console.error('Error fetching all signals:', error);
@@ -161,7 +165,7 @@ export const signalService = {
   async getSignalById(signalId: string) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -182,15 +186,15 @@ export const signalService = {
         return {
           id: data.id,
           type: data.type as 'buy' | 'sell',
-          price: data.price,
-          pair: data.pair,
-          confidence: data.confidence,
+          price: Number(data.price) || 0,
+          pair: data.pair || '',
+          confidence: Number(data.confidence) || 0,
           result: data.result as 'win' | 'loss' | undefined,
-          profitLoss: data.profit_loss,
-          time: data.time,
-          timeframe: data.timeframe,
-          martingaleStep: data.martingale_step,
-          martingaleMultiplier: data.martingale_multiplier
+          profit_loss: Number(data.profit_loss) || 0,
+          time: data.time || new Date().toISOString(),
+          timeframe: Number(data.timeframe) || 1,
+          martingaleStep: Number(data.martingale_step) || 0,
+          martingaleMultiplier: Number(data.martingale_multiplier) || 1.0
         };
       }
 
@@ -208,7 +212,7 @@ export const signalService = {
   ) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -271,7 +275,7 @@ export const signalService = {
   async clearSignalHistory() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         return;
       }
@@ -286,6 +290,137 @@ export const signalService = {
       }
     } catch (error) {
       console.error('Error clearing signal history:', error);
+    }
+  },
+
+  // Admin Methods
+  async createAdminSignal(signal: { pair: string; type: 'buy' | 'sell'; scheduled_time: string; timeframe: number }) {
+    try {
+      const { data, error } = await supabase
+        .from('admin_signals')
+        .insert([{
+          ...signal,
+          status: 'pending'
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error creating admin signal:', error);
+      return null;
+    }
+  },
+
+  async getAdminSignals() {
+    try {
+      const { data, error } = await supabase
+        .from('admin_signals')
+        .select('*')
+        .order('scheduled_time', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error fetching admin signals:', error);
+      return [];
+    }
+  },
+
+  async deleteAdminSignal(id: string) {
+    try {
+      const { error } = await supabase
+        .from('admin_signals')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error deleting admin signal:', error);
+      return false;
+    }
+  },
+
+  normalizePair(pair: string) {
+    if (!pair) return '';
+    // Normaliza para formato padrão (ex: BTC/USD -> BTC/USDT para comparação)
+    // Remove espaços e converte para uppercase
+    let normalized = pair.toUpperCase().trim();
+    // Se terminar com USD, converte para USDT para padronização de comparação
+    if (normalized.endsWith('/USD')) {
+      normalized = normalized.replace('/USD', '/USDT');
+    }
+    return normalized;
+  },
+
+  async getPendingAdminSignal(pair?: string) {
+    try {
+      const now = new Date();
+      // Busca sinais agendados para os próximos 2 minutos ou que já passaram mas ainda não foram executados (até 5 min atrás)
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+      const twoMinutesFromNow = new Date(now.getTime() + 2 * 60 * 1000).toISOString();
+
+      let query = supabase
+        .from('admin_signals')
+        .select('*')
+        .eq('status', 'pending')
+        .gte('scheduled_time', fiveMinutesAgo)
+        .lte('scheduled_time', twoMinutesFromNow)
+        .order('scheduled_time', { ascending: true });
+
+      if (pair) {
+        // Tenta buscar com o par exato OU com a variação (USD/USDT)
+        // Como o Supabase não tem OR fácil aqui sem query builder complexo, 
+        // vamos buscar todos no intervalo de tempo e filtrar no código para garantir
+        // Isso é seguro pois o volume de sinais admin é baixo
+      }
+
+      await query.maybeSingle();
+
+      // Se não filtrar por par no banco, filtramos aqui
+      // Mas espere, query.maybeSingle() retorna apenas um.
+      // Vamos mudar a estratégia: buscar todos os pendentes no horário e filtrar no código
+
+      const { data: allSignals, error: fetchError } = await supabase
+        .from('admin_signals')
+        .select('*')
+        .eq('status', 'pending')
+        .gte('scheduled_time', fiveMinutesAgo)
+        .lte('scheduled_time', twoMinutesFromNow)
+        .order('scheduled_time', { ascending: true });
+
+      if (fetchError) throw fetchError;
+
+      if (!allSignals || allSignals.length === 0) return null;
+
+      if (pair) {
+        const normalizedTarget = this.normalizePair(pair);
+        // Encontra o primeiro que combine (normalizado)
+        const match = allSignals.find(s => this.normalizePair(s.pair) === normalizedTarget);
+        return match || null;
+      }
+
+      return allSignals[0];
+    } catch (error) {
+      console.error('Error checking pending admin signal:', error);
+      return null;
+    }
+  },
+
+  async markAdminSignalExecuted(id: string) {
+    try {
+      const { error } = await supabase
+        .from('admin_signals')
+        .update({ status: 'executed' })
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error marking admin signal executed:', error);
+      return false;
     }
   }
 };
