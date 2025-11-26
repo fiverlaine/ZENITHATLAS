@@ -7,10 +7,9 @@ import { ptBR } from 'date-fns/locale';
 
 interface Props {
   signal: Signal | null;
-  currentPrice?: number;
 }
 
-export const ActiveSignal: React.FC<Props> = ({ signal, currentPrice }) => {
+export const ActiveSignal: React.FC<Props> = ({ signal }) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('');
 
   useEffect(() => {
@@ -75,10 +74,6 @@ export const ActiveSignal: React.FC<Props> = ({ signal, currentPrice }) => {
   const signalBgClass = isBuy ? 'bg-primary' : 'bg-red-500';
   const SignalIcon = isBuy ? TrendingUp : TrendingDown;
 
-  const profitLoss = currentPrice && signal.price
-    ? ((currentPrice - signal.price) / signal.price * 100) * (isBuy ? 1 : -1)
-    : 0;
-
   return (
     <Card className={`${isBuy ? 'bg-primary/5 border-primary/30' : 'bg-red-500/5 border-red-500/30'} border-2`}>
       <div className="flex items-start justify-between mb-4 gap-2">
@@ -100,28 +95,16 @@ export const ActiveSignal: React.FC<Props> = ({ signal, currentPrice }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
         <div className="bg-bg-card p-3 rounded-lg border border-white/5 min-w-0">
           <div className="flex items-center text-gray-400 text-xs mb-1 truncate">
             <DollarSign size={12} className="mr-1 flex-shrink-0" />
-            <span className="truncate">Entrada</span>
+            <span className="truncate">Preço de Entrada</span>
           </div>
           <p className="text-sm md:text-base font-bold text-white break-words">
-            ${(signal.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${(signal.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
           </p>
         </div>
-
-        {currentPrice && (
-          <div className="bg-bg-card p-3 rounded-lg border border-white/5 min-w-0">
-            <div className="flex items-center text-gray-400 text-xs mb-1 truncate">
-              <DollarSign size={12} className="mr-1 flex-shrink-0" />
-              <span className="truncate">Atual</span>
-            </div>
-            <p className="text-sm md:text-base font-bold text-white break-words">
-              ${currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-          </div>
-        )}
 
         <div className="bg-bg-card p-3 rounded-lg border border-white/5 min-w-0">
           <div className="flex items-center text-gray-400 text-xs mb-1 truncate">
@@ -134,22 +117,11 @@ export const ActiveSignal: React.FC<Props> = ({ signal, currentPrice }) => {
         <div className="bg-bg-card p-3 rounded-lg border border-white/5 min-w-0">
           <div className="flex items-center text-gray-400 text-xs mb-1 truncate">
             <Clock size={12} className="mr-1 flex-shrink-0" />
-            <span className="truncate">Tempo</span>
+            <span className="truncate">Tempo Restante</span>
           </div>
           <p className="text-xs md:text-sm font-bold text-white break-words">{timeRemaining}</p>
         </div>
       </div>
-
-      {currentPrice && profitLoss !== 0 && (
-        <div className={`p-3 md:p-4 rounded-lg ${profitLoss > 0 ? 'bg-primary/10 border border-primary/20' : 'bg-red-500/10 border border-red-500/20'}`}>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-gray-400 text-sm md:text-base truncate">Lucro/Prejuízo Atual</span>
-            <span className={`text-lg md:text-xl font-bold flex-shrink-0 ${profitLoss > 0 ? 'text-primary' : 'text-red-500'}`}>
-              {profitLoss > 0 ? '+' : ''}{profitLoss.toFixed(2)}%
-            </span>
-          </div>
-        </div>
-      )}
 
       <div className="mt-4 pt-4 border-t border-white/10">
         <p className="text-xs text-gray-500">

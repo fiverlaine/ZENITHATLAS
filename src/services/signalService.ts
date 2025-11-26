@@ -358,51 +358,45 @@ export const signalService = {
   async getPendingAdminSignal(pair?: string) {
     try {
       const now = new Date();
-      // Busca sinais agendados para os próximos 2 minutos ou que já passaram mas ainda não foram executados (até 5 min atrás)
-      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
-      const twoMinutesFromNow = new Date(now.getTime() + 2 * 60 * 1000).toISOString();
-
-      let query = supabase
-        .from('admin_signals')
-        .select('*')
-        .eq('status', 'pending')
-        .gte('scheduled_time', fiveMinutesAgo)
-        .lte('scheduled_time', twoMinutesFromNow)
-        .order('scheduled_time', { ascending: true });
-
-      if (pair) {
-        // Tenta buscar com o par exato OU com a variação (USD/USDT)
-        // Como o Supabase não tem OR fácil aqui sem query builder complexo, 
-        // vamos buscar todos no intervalo de tempo e filtrar no código para garantir
-        // Isso é seguro pois o volume de sinais admin é baixo
-      }
-
-      await query.maybeSingle();
-
-      // Se não filtrar por par no banco, filtramos aqui
-      // Mas espere, query.maybeSingle() retorna apenas um.
-      // Vamos mudar a estratégia: buscar todos os pendentes no horário e filtrar no código
+      // CORREÇÃO: Busca sinais que serão executados no PRÓXIMO minuto (até 2 minutos no futuro)
+      // Isso permite que o sinal seja exibido 1 minuto ANTES do horário agendado
+      // Exemplo: Admin agenda 13:50, sistema busca às 13:49 e encontra, exibe o sinal com entrada 13:50
+      const oneMinuteAgo = new Date(now.getTime() - 1 * 60 * 1000).toISOString();
+      const threeMinutesFromNow = new Date(now.getTime() + 3 * 60 * 1000).toISOString();
 
       const { data: allSignals, error: fetchError } = await supabase
         .from('admin_signals')
         .select('*')
         .eq('status', 'pending')
-        .gte('scheduled_time', fiveMinutesAgo)
-        .lte('scheduled_time', twoMinutesFromNow)
+        .gte('scheduled_time', oneMinuteAgo)
+        .lte('scheduled_time', threeMinutesFromNow)
         .order('scheduled_time', { ascending: true });
 
       if (fetchError) throw fetchError;
 
       if (!allSignals || allSignals.length === 0) return null;
 
+      // Filtra para encontrar sinais que:
+      // 1. Estão agendados para o próximo minuto (para executar 1 min antes)
+      // 2. Ou que já passaram mas ainda não foram executados (margem de 1 min)
+      const nowMs = now.getTime();
+      const validSignals = allSignals.filter(signal => {
+        const scheduledMs = new Date(signal.scheduled_time).getTime();
+        const timeDiff = scheduledMs - nowMs;
+        // Válido se: entre -60s (passou até 1 min) até +180s (próximos 3 min)
+        return timeDiff >= -60000 && timeDiff <= 180000;
+      });
+
+      if (validSignals.length === 0) return null;
+
       if (pair) {
         const normalizedTarget = this.normalizePair(pair);
         // Encontra o primeiro que combine (normalizado)
-        const match = allSignals.find(s => this.normalizePair(s.pair) === normalizedTarget);
+        const match = validSignals.find(s => this.normalizePair(s.pair) === normalizedTarget);
         return match || null;
       }
 
-      return allSignals[0];
+      return validSignals[0];
     } catch (error) {
       console.error('Error checking pending admin signal:', error);
       return null;

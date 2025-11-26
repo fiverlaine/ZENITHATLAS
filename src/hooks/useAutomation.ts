@@ -40,6 +40,12 @@ export const useAutomation = (
   const selectedPairRef = useRef(selectedPair);
   const executedAdminSignalsRef = useRef<Set<string>>(new Set());
   const scheduledExecutionRef = useRef<NodeJS.Timeout>();
+  const currentSignalRef = useRef(currentSignal); // Ref para acesso no realtime
+  
+  // Mantém a ref do currentSignal atualizada
+  useEffect(() => {
+    currentSignalRef.current = currentSignal;
+  }, [currentSignal]);
 
   const resetState = useCallback(() => {
     if (!mounted.current) return;
@@ -92,10 +98,33 @@ export const useAutomation = (
   }, [updateSignal]);
 
   // Function to execute admin signal (extracted for reuse)
+  // CORREÇÃO: Agora executa 1 minuto ANTES do scheduled_time
+  // O sinal é gerado com time = scheduled_time (horário real de entrada)
   const executeAdminSignal = useCallback(async (adminSignal: any) => {
     if (executedAdminSignalsRef.current.has(adminSignal.id)) return;
 
-    console.log('Executing system signal:', adminSignal);
+    const now = Date.now();
+    const scheduledTime = new Date(adminSignal.scheduled_time).getTime();
+    const timeDiff = scheduledTime - now;
+
+    console.log(`🔔 Admin Signal Check: ${adminSignal.pair} scheduled for ${new Date(scheduledTime).toISOString()}`);
+    console.log(`⏰ Time until entry: ${Math.round(timeDiff / 1000)}s`);
+
+    // NOVA LÓGICA: Só executa se estiver entre 0 e 90 segundos antes do scheduled_time
+    // Isso garante que o sinal aparece ~1 minuto antes da entrada real
+    if (timeDiff > 90000) {
+      console.log(`⏳ Too early to execute, waiting... (${Math.round(timeDiff / 1000)}s remaining)`);
+      return; // Muito cedo, não executa ainda
+    }
+
+    // Se já passou mais de 60 segundos do horário agendado, é tarde demais
+    if (timeDiff < -60000) {
+      console.log(`⚠️ Signal expired, marking as executed`);
+      await signalService.markAdminSignalExecuted(adminSignal.id);
+      return;
+    }
+
+    console.log('✅ Executing system signal:', adminSignal);
     executedAdminSignalsRef.current.add(adminSignal.id);
 
     const signalId = uuidv4();
@@ -107,26 +136,18 @@ export const useAutomation = (
       id: signalId,
       type: adminSignal.type as 'buy' | 'sell',
       price: 0,
-      time: adminSignal.scheduled_time, // Use exact scheduled time
+      time: adminSignal.scheduled_time, // Usa o horário AGENDADO como horário de entrada
       pair: adminSignal.pair,
       confidence: 99,
       martingaleStep: 0,
       timeframe: adminSignal.timeframe
     };
 
-    // Busca preço atual ou histórico
+    // Busca preço atual (será atualizado no momento exato da entrada pelo useSignalResults)
     const marketData = await fetchMarketData(adminSignal.pair, adminSignal.timeframe);
     if (Array.isArray(marketData) && marketData.length > 0) {
-      const scheduledTime = new Date(adminSignal.scheduled_time).getTime() / 1000;
-      // Tenta encontrar o candle correspondente ao horário agendado
-      const matchingCandle = marketData.find(c => Math.abs(c.time - scheduledTime) < 60);
-
-      if (matchingCandle) {
-        signal.price = matchingCandle.close;
-      } else {
-        // Se não encontrar (ex: futuro ou muito antigo), usa o último
-        signal.price = marketData[marketData.length - 1].close;
-      }
+      // Usa o último preço disponível como referência inicial
+      signal.price = marketData[marketData.length - 1].close;
     }
 
     const createdSignal = await signalService.createSignal(signal);
@@ -135,7 +156,7 @@ export const useAutomation = (
       retryCount.current = 0;
       setCurrentSignal(signal);
       addSignal(signal);
-      setAnalyzing(false); // Stop analyzing UI since signal is found
+      setAnalyzing(false);
 
       // Mark as executed in DB
       await signalService.markAdminSignalExecuted(adminSignal.id);
@@ -144,20 +165,30 @@ export const useAutomation = (
         clearTimeout(signalCheckTimeout.current);
       }
 
-      const checkTime = adminSignal.timeframe * 60 * 1000;
+      // Calcula quando verificar o resultado:
+      // - O sinal entra no scheduled_time
+      // - O sinal sai no scheduled_time + (timeframe * 60 * 1000)
+      // - Começamos a monitorar imediatamente, mas a verificação real só acontece no tempo certo
+      const entryTime = new Date(adminSignal.scheduled_time).getTime();
+      const exitTime = entryTime + (adminSignal.timeframe * 60 * 1000);
+      const timeUntilExit = exitTime - Date.now();
+
+      console.log(`📊 Signal ${signalId} - Entry: ${new Date(entryTime).toLocaleTimeString()}, Exit: ${new Date(exitTime).toLocaleTimeString()}`);
+      console.log(`⏱️ Time until result check: ${Math.round(timeUntilExit / 1000)}s`);
+
+      // Inicia o monitoramento imediatamente - useSignalResults vai esperar os tempos corretos
       signalCheckTimeout.current = setTimeout(() => {
         checkSignalResult(signal, adminSignal.timeframe, handleSignalResult);
-      }, checkTime);
+      }, 0);
 
+      // Backup timeout para garantir resultado
+      const backupTime = Math.max(timeUntilExit + 15000, 15000);
       setTimeout(() => {
-        if (mounted.current) {
-          handleSignalResult({
-            ...signal,
-            result: 'loss',
-            profit_loss: 0
-          });
+        if (mounted.current && !signal.result) {
+          console.log(`⚠️ Backup check for signal ${signalId}`);
+          checkSignalResult(signal, adminSignal.timeframe, handleSignalResult);
         }
-      }, checkTime + 2000);
+      }, backupTime);
     }
   }, [setCurrentSignal, addSignal, checkSignalResult, handleSignalResult]);
 
@@ -168,9 +199,12 @@ export const useAutomation = (
 
     const now = Date.now();
     const scheduledTime = new Date(signal.scheduled_time).getTime();
-    const delay = Math.max(0, scheduledTime - now);
+    // CORREÇÃO: Executa 60 segundos ANTES do horário agendado (1 minuto antes)
+    // Isso permite que o usuário veja o sinal antes da entrada real
+    const executeAt = scheduledTime - 60000; // 1 minuto antes
+    const delay = Math.max(0, executeAt - now);
 
-    console.log(`Scheduling system signal execution in ${delay}ms`);
+    console.log(`📅 Scheduling signal execution ${Math.round(delay / 1000)}s from now (1 min before entry at ${new Date(scheduledTime).toLocaleTimeString()})`);
 
     scheduledExecutionRef.current = setTimeout(() => {
       executeAdminSignal(signal);
@@ -178,47 +212,106 @@ export const useAutomation = (
     }, delay);
   }, [executeAdminSignal]);
 
-  // Realtime subscription for Admin Signals
+  // Realtime subscription for Admin Signals - SEMPRE ATIVO quando buscando
+  // CORREÇÃO: Subscription independente do par para capturar QUALQUER sinal admin
   useEffect(() => {
     if (!isAutomated) return;
 
+    console.log('📡 Iniciando subscription realtime para sinais admin...');
+
     const channel = supabase
-      .channel('admin-signals-realtime')
+      .channel('admin-signals-realtime-' + Date.now()) // ID único para evitar conflitos
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT', // Captura apenas novos sinais
         schema: 'public',
         table: 'admin_signals'
       }, async (payload) => {
+        console.log('📡 REALTIME: Novo sinal admin recebido!', payload);
+        
         const newSignal = payload.new as any;
-        if (!newSignal || newSignal.status !== 'pending') return;
+        if (!newSignal || newSignal.status !== 'pending') {
+          console.log('📡 Sinal ignorado (status não é pending)');
+          return;
+        }
 
-        // Normaliza pares para comparação (ex: BTC/USD == BTC/USDT)
+        // Normaliza pares para comparação
         const normalizedNew = signalService.normalizePair(newSignal.pair);
-        const normalizedCurrent = signalService.normalizePair(selectedPair);
+        const normalizedCurrent = signalService.normalizePair(selectedPairRef.current);
 
-        if (normalizedNew !== normalizedCurrent) return;
+        console.log(`📡 Comparando: sinal=${normalizedNew}, buscando=${normalizedCurrent}`);
+
+        // IMPORTANTE: Verifica se o par corresponde
+        if (normalizedNew !== normalizedCurrent) {
+          console.log(`📡 Par não corresponde, ignorando (${normalizedNew} != ${normalizedCurrent})`);
+          return;
+        }
+
+        // Verifica se já está processando ou já tem sinal ativo
+        if (operationInProgress.current || currentSignalRef.current) {
+          console.log('📡 Já existe operação em andamento, ignorando');
+          return;
+        }
 
         const now = Date.now();
         const scheduledTime = new Date(newSignal.scheduled_time).getTime();
         const timeDiff = scheduledTime - now;
 
-        // Se é um sinal novo para AGORA (ou passado recente)
-        if (timeDiff <= 0 && timeDiff > -300000) {
+        console.log(`📡 ⚡ REALTIME: Sinal ${newSignal.pair} recebido! Entrada em ${Math.round(timeDiff / 1000)}s`);
+
+        // EXECUÇÃO IMEDIATA: Se o sinal está dentro da janela de tempo
+        if (timeDiff <= 90000 && timeDiff > -60000) {
+          console.log('📡 ✅ Executando sinal IMEDIATAMENTE via realtime!');
+          operationInProgress.current = true;
+          setAnalyzing(false);
           await executeAdminSignal(newSignal);
           if (mounted.current) setWaitingForAdmin(false);
-        } else if (timeDiff > 0 && timeDiff < 120000) {
-          // Se é para o futuro próximo (2 min), entra em modo de espera e agenda execução
-          console.log('Realtime: System signal received for future, waiting...');
+        } else if (timeDiff > 90000 && timeDiff < 300000) {
+          // Se falta mais de 90s mas menos de 5min, agenda a execução
+          console.log(`📡 📅 Agendando execução para daqui ${Math.round((timeDiff - 60000) / 1000)}s`);
           if (mounted.current) setWaitingForAdmin(true);
           scheduleAdminSignalExecution(newSignal);
         }
       })
-      .subscribe();
+      .on('postgres_changes', {
+        event: 'UPDATE', // Também captura updates (caso mude de cancelled para pending)
+        schema: 'public',
+        table: 'admin_signals'
+      }, async (payload) => {
+        const newSignal = payload.new as any;
+        const oldSignal = payload.old as any;
+        
+        // Se mudou para pending e antes não era
+        if (newSignal?.status === 'pending' && oldSignal?.status !== 'pending') {
+          console.log('📡 Sinal atualizado para pending, verificando...');
+          
+          const normalizedNew = signalService.normalizePair(newSignal.pair);
+          const normalizedCurrent = signalService.normalizePair(selectedPairRef.current);
+          
+          if (normalizedNew !== normalizedCurrent) return;
+          if (operationInProgress.current || currentSignalRef.current) return;
+
+          const now = Date.now();
+          const scheduledTime = new Date(newSignal.scheduled_time).getTime();
+          const timeDiff = scheduledTime - now;
+
+          if (timeDiff <= 90000 && timeDiff > -60000) {
+            console.log('📡 ✅ Executando sinal atualizado via realtime!');
+            operationInProgress.current = true;
+            setAnalyzing(false);
+            await executeAdminSignal(newSignal);
+            if (mounted.current) setWaitingForAdmin(false);
+          }
+        }
+      })
+      .subscribe((status) => {
+        console.log(`📡 Status da subscription: ${status}`);
+      });
 
     return () => {
+      console.log('📡 Removendo subscription realtime...');
       supabase.removeChannel(channel);
     };
-  }, [isAutomated, executeAdminSignal, selectedPair]);
+  }, [isAutomated, executeAdminSignal, scheduleAdminSignalExecution]);
 
   const analyze = useCallback(async () => {
     if (!mounted.current || !isAutomated) return;
@@ -251,26 +344,38 @@ export const useAutomation = (
       operationInProgress.current = true;
 
       // 1. Verificar Sinais Administrativos (Prioridade Total)
+      // CORREÇÃO: Agora busca sinais que serão executados no próximo minuto
       const adminSignal = await signalService.getPendingAdminSignal(selectedPair);
 
       if (adminSignal) {
         const scheduledTime = new Date(adminSignal.scheduled_time).getTime();
         const timeDiff = scheduledTime - now;
 
-        // Se falta menos de 2 minutos, "congela" o sistema (fica buscando...)
-        if (timeDiff > 0 && timeDiff < 120000) {
-          console.log('System signal pending, pausing analysis...');
-          if (mounted.current) setWaitingForAdmin(true);
-          scheduleAdminSignalExecution(adminSignal);
-          // Mantém analyzing = true para mostrar o popup, mas não faz nada
+        console.log(`🔍 Found admin signal for ${adminSignal.pair}, scheduled in ${Math.round(timeDiff / 1000)}s`);
+
+        // NOVA LÓGICA: Executa 1 minuto antes (entre 0 e 90 segundos antes da entrada)
+        // Se falta entre 0 e 90 segundos, executa AGORA (usuário vê 1 min antes da entrada)
+        if (timeDiff > 0 && timeDiff <= 90000) {
+          console.log('⚡ Admin signal ready! Executing 1 min before entry...');
+          await executeAdminSignal(adminSignal);
+          if (mounted.current) setWaitingForAdmin(false);
           return;
         }
 
-        // Se chegou a hora (ou passou até 5 min), executa
-        if (timeDiff <= 0 && timeDiff > -300000) {
+        // Se falta mais de 90s mas menos de 3 minutos, agenda a execução
+        if (timeDiff > 90000 && timeDiff < 180000) {
+          console.log('📅 Admin signal scheduled, waiting...');
+          if (mounted.current) setWaitingForAdmin(true);
+          scheduleAdminSignalExecution(adminSignal);
+          return;
+        }
+
+        // Se já passou (até 60s), ainda tenta executar
+        if (timeDiff <= 0 && timeDiff > -60000) {
+          console.log('⚠️ Admin signal slightly past, executing now...');
           await executeAdminSignal(adminSignal);
           if (mounted.current) setWaitingForAdmin(false);
-          return; // Sai da função, não roda análise técnica
+          return;
         }
       }
 
@@ -522,6 +627,47 @@ export const useAutomation = (
       unsubscribe();
     };
   }, []);
+
+  // Polling rápido de backup para sinais admin (caso realtime falhe)
+  useEffect(() => {
+    if (!isAutomated) return;
+
+    const checkAdminSignals = async () => {
+      // Não verifica se já tem operação ou sinal ativo
+      if (operationInProgress.current || currentSignalRef.current) return;
+      
+      try {
+        const adminSignal = await signalService.getPendingAdminSignal(selectedPairRef.current);
+        
+        if (adminSignal && !executedAdminSignalsRef.current.has(adminSignal.id)) {
+          const now = Date.now();
+          const scheduledTime = new Date(adminSignal.scheduled_time).getTime();
+          const timeDiff = scheduledTime - now;
+          
+          // Se está na janela de execução (entre -60s e +90s)
+          if (timeDiff <= 90000 && timeDiff > -60000) {
+            console.log('🔄 Polling: Encontrou sinal admin pendente, executando...');
+            operationInProgress.current = true;
+            setAnalyzing(false);
+            await executeAdminSignal(adminSignal);
+            if (mounted.current) setWaitingForAdmin(false);
+          }
+        }
+      } catch (error) {
+        console.error('Erro no polling de sinais admin:', error);
+      }
+    };
+
+    // Verifica a cada 2 segundos como backup do realtime
+    const pollInterval = setInterval(checkAdminSignals, 2000);
+    
+    // Verifica imediatamente também
+    checkAdminSignals();
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [isAutomated, executeAdminSignal]);
 
   // Cleanup effect
   useEffect(() => {

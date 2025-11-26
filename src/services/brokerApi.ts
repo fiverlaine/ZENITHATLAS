@@ -6,7 +6,7 @@ const PARTNER = 'mybroker';
 
 const api = axios.create({
     baseURL: SYMBOL_PRICES_API,
-    timeout: 10000,
+    timeout: 15000, // Aumentado para 15s
     headers: {
         'api-key': API_KEY,
         'x-partner': PARTNER,
@@ -29,55 +29,87 @@ export interface BrokerCandle {
     time: number;
 }
 
+// Cache de preços para evitar requisições duplicadas
+const priceCache = new Map<string, { price: number; timestamp: number }>();
+const CACHE_TTL = 5000; // 5 segundos
+
+// Função de retry com backoff
+const retryWithBackoff = async <T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> => {
+    try {
+        return await fn();
+    } catch (error) {
+        if (retries <= 0) throw error;
+        console.log(`Retry attempt, waiting ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return retryWithBackoff(fn, retries - 1, delay * 1.5);
+    }
+};
+
 export const brokerApi = {
     /**
      * Busca o preço em um momento específico
+     * CORREÇÃO: Agora retorna o closePrice que é o preço correto para aquele momento
      * @param pair Par de moedas (ex: BTCUSDT, ADA/USD)
      * @param timestamp Timestamp do momento (em ms)
      */
     async getPriceAtTime(pair: string, timestamp: number): Promise<number | null> {
+        // Normaliza o par
+        let cleanPair = pair.replace('/', '');
+        if (cleanPair.endsWith('USD') && !cleanPair.endsWith('USDT')) {
+            cleanPair = cleanPair.replace('USD', 'USDT');
+        }
+
+        // Verifica cache
+        const cacheKey = `${cleanPair}-${Math.floor(timestamp / 60000)}`;
+        const cached = priceCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            console.log(`📌 Using cached price for ${cleanPair}: ${cached.price}`);
+            return cached.price;
+        }
+
         try {
-            // Normaliza o par: remove '/' e garante que USD vire USDT se necessário
-            let cleanPair = pair.replace('/', '');
-            if (cleanPair.endsWith('USD') && !cleanPair.endsWith('USDT')) {
-                cleanPair = cleanPair.replace('USD', 'USDT');
-            }
+            console.log(`🔍 Fetching price for ${cleanPair} at ${new Date(timestamp).toISOString()}`);
 
-            console.log(`Fetching price for ${cleanPair} at ${new Date(timestamp).toISOString()}`);
-
-            const response = await api.get('/symbol-price/last', {
-                params: {
-                    pair: cleanPair,
-                    slot: 'default',
-                    limitTime: timestamp
-                }
-            });
+            const response = await retryWithBackoff(async () => {
+                return api.get('/symbol-price/last', {
+                    params: {
+                        pair: cleanPair,
+                        slot: 'default',
+                        limitTime: timestamp
+                    }
+                });
+            }, 3, 500);
 
             const data = response.data;
 
-            // Se retornou "OK", significa que está no futuro
+            // Se retornou "OK", significa que está no futuro - espera um pouco e tenta de novo
             if (data === 'OK' || typeof data === 'string') {
-                console.warn(`Price not available yet (time in future): ${new Date(timestamp).toISOString()}`);
+                console.warn(`⏳ Price not available yet (time in future): ${new Date(timestamp).toISOString()}`);
                 return null;
             }
 
-            // Retorna o closePrice (preço mais recente até aquele momento)
+            // Retorna o closePrice (preço no momento especificado)
             if (data && typeof data === 'object' && 'closePrice' in data) {
-                console.log(`Price at ${new Date(timestamp).toISOString()}: ${data.closePrice}`);
-                return data.closePrice;
+                const price = Number(data.closePrice);
+                console.log(`✅ Price at ${new Date(timestamp).toISOString()}: ${price}`);
+                
+                // Salva no cache
+                priceCache.set(cacheKey, { price, timestamp: Date.now() });
+                
+                return price;
             }
 
-            console.warn('Invalid response structure from Broker API:', data);
+            console.warn('⚠️ Invalid response structure from Broker API:', data);
             return null;
         } catch (error: any) {
-            console.error('Erro ao buscar preço na Broker API:', error);
+            console.error('❌ Erro ao buscar preço na Broker API:', error?.message || error);
 
             if (error.response?.status === 404 || error.response?.status === 400) {
-                console.warn(`Price not found for ${pair} at ${new Date(timestamp).toISOString()}`);
+                console.warn(`⚠️ Price not found for ${pair} at ${new Date(timestamp).toISOString()}`);
                 return null;
             }
 
-            throw error;
+            return null; // Retorna null ao invés de throw para não quebrar o fluxo
         }
     },
 

@@ -26,7 +26,6 @@ export const Dashboard: React.FC = () => {
 
   const [showSettings, setShowSettings] = useState(false);
   const [showSignalPopup, setShowSignalPopup] = useState(false);
-  const [currentPrice, setCurrentPrice] = useState<number>();
   const [isSearching, setIsSearching] = useState(false);
   const [remainingTime, setRemainingTime] = useState<string>('');
 
@@ -69,17 +68,6 @@ export const Dashboard: React.FC = () => {
     setAutomated(false);
     toggleAutomation(); // Para a análise
   };
-
-  // Simular preço atual para demonstração
-  useEffect(() => {
-    if (currentSignal && currentSignal.price) {
-      const interval = setInterval(() => {
-        const variation = (Math.random() - 0.5) * 100;
-        setCurrentPrice((currentSignal.price || 0) + variation);
-      }, 2000);
-      return () => clearInterval(interval);
-    }
-  }, [currentSignal]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -130,7 +118,6 @@ export const Dashboard: React.FC = () => {
       <SignalPopup
         isOpen={showSignalPopup}
         signal={currentSignal}
-        currentPrice={currentPrice}
         strategyId={selectedStrategy}
         onClose={() => {
           setShowSignalPopup(false);
@@ -218,7 +205,7 @@ export const Dashboard: React.FC = () => {
       {/* Layout Principal */}
       <div className="space-y-6">
         <UnifiedChart selectedPair={selectedPair} timeframe={timeframe} />
-        <ActiveSignal signal={currentSignal} currentPrice={currentPrice} />
+        <ActiveSignal signal={currentSignal} />
       </div>
 
       {showSettings && (

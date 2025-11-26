@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Signal } from '../types/trading';
-import { ArrowUpCircle, ArrowDownCircle, X, Target, Clock, Loader2, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, X, Target, Clock, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface Props {
     isOpen: boolean;
     signal: Signal | null;
-    currentPrice?: number;
     onClose: () => void;
     strategyId?: string;
 }
@@ -38,7 +37,7 @@ const STRATEGY_INFO: Record<string, { name: string; indicators: string[] }> = {
     }
 };
 
-export const SignalPopup: React.FC<Props> = ({ isOpen, signal, currentPrice, onClose, strategyId }) => {
+export const SignalPopup: React.FC<Props> = ({ isOpen, signal, onClose, strategyId }) => {
     const [timeLeft, setTimeLeft] = useState<string>('');
     const [status, setStatus] = useState<'waiting' | 'active' | 'finished' | 'loading'>('waiting');
     const [finalResult, setFinalResult] = useState<'WIN' | 'LOSS' | null>(null);
@@ -288,34 +287,19 @@ export const SignalPopup: React.FC<Props> = ({ isOpen, signal, currentPrice, onC
 
                                 {/* Preço de Entrada - só mostra quando active */}
                                 {status === 'active' && (
-                                    <div className="flex justify-between items-center gap-2">
-                                        <span className="text-gray-400 flex items-center gap-1 text-xs truncate min-w-0">
-                                            <Target size={12} className="flex-shrink-0" />
-                                            <span className="truncate">Preço de Entrada</span>
-                                        </span>
-                                        <span className="text-white font-mono text-[10px] md:text-xs font-bold break-words">
-                                            {signal.price.toFixed(5)}
-                                        </span>
-                                    </div>
+                                    <>
+                                        <div className="flex justify-between items-center gap-2">
+                                            <span className="text-gray-400 flex items-center gap-1 text-xs truncate min-w-0">
+                                                <Target size={12} className="flex-shrink-0" />
+                                                <span className="truncate">Preço de Entrada</span>
+                                            </span>
+                                            <span className="text-white font-mono text-[10px] md:text-xs font-bold break-words">
+                                                {signal.price.toFixed(5)}
+                                            </span>
+                                        </div>
+                                        <div className="h-px bg-white/5" />
+                                    </>
                                 )}
-
-                                {/* Preço Atual - só mostra quando active */}
-                                {status === 'active' && currentPrice && (
-                                    <div className="flex justify-between items-center gap-2">
-                                        <span className="text-gray-400 flex items-center gap-1 text-xs truncate min-w-0">
-                                            <Activity size={12} className="flex-shrink-0" />
-                                            <span className="truncate">Preço Atual</span>
-                                        </span>
-                                        <span className={`font-mono text-[10px] md:text-xs font-bold break-words ${isBuy
-                                            ? (currentPrice > signal.price ? 'text-green-500' : 'text-red-500')
-                                            : (currentPrice < signal.price ? 'text-green-500' : 'text-red-500')
-                                            }`}>
-                                            {currentPrice.toFixed(5)}
-                                        </span>
-                                    </div>
-                                )}
-
-                                <div className="h-px bg-white/5" />
 
                                 <div className="flex justify-between items-center gap-2">
                                     <span className="text-gray-400 flex items-center gap-1 text-xs truncate min-w-0">
