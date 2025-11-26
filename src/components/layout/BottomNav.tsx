@@ -14,7 +14,7 @@ export const BottomNav: React.FC<Props> = ({ currentView, onViewChange }) => {
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-bg-sidebar/95 backdrop-blur-xl border-t border-white/5 z-50 pb-safe">
+    <nav className="w-full bg-bg-sidebar/95 backdrop-blur-xl border-t border-white/5 z-50 pb-safe">
       <div className="flex items-center justify-around h-20 px-4">
         {navItems.map((item) => {
           const Icon = item.icon;

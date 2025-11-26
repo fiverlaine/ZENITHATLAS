@@ -87,8 +87,10 @@ export const useTradeStore = create<TradeState>()(
             s.id === signal.id ? signal : s
           );
 
+          // Mantém o currentSignal atualizado mas NÃO o remove quando tem resultado
+          // O popup será fechado manualmente pelo usuário
           const updatedCurrentSignal = state.currentSignal?.id === signal.id
-            ? (signal.result ? null : signal)
+            ? signal // Atualiza o sinal mas mantém ele ativo
             : state.currentSignal;
 
           return {

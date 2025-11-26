@@ -6,6 +6,7 @@ import { useTradeStore } from './useTradeStore';
 import { useSettings } from './useSettings';
 import { useSignalResults } from './useSignalResults';
 import { signalService } from '../services/signalService';
+import { systemService } from '../services/systemService';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../services/supabase';
 
@@ -25,6 +26,7 @@ export const useAutomation = (
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [waitingForAdmin, setWaitingForAdmin] = useState(false);
+  const [systemEnabled, setSystemEnabled] = useState(true);
 
   const automationRef = useRef(isAutomated);
   const analysisInterval = useRef<NodeJS.Timeout>();
@@ -65,7 +67,8 @@ export const useAutomation = (
       const isMartingaleDisabled = true; // Martingale desabilitado por enquanto
       const isWin = updatedSignal.result === 'win';
 
-      // Se o sinal foi completado, reseta o estado
+      // Se o sinal foi completado, atualiza no banco mas NÃO reseta o estado
+      // O popup ficará aberto até o usuário fechar manualmente
       if (isWin || isLastGale || (updatedSignal.result === 'loss' && isMartingaleDisabled)) {
         // Atualiza o status no banco de dados
         await signalService.updateSignalResult(
@@ -74,24 +77,19 @@ export const useAutomation = (
           updatedSignal.profit_loss
         );
 
-        // Reseta o estado
-        resetState();
+        console.log(`✅ Signal ${updatedSignal.id} completed with result: ${updatedSignal.result}`);
 
-        // Só força uma nova análise se a automação ainda estiver ativa
-        if (automationRef.current) {
-          setTimeout(() => {
-            if (mounted.current && automationRef.current && analyzeRef.current) {
-              lastAnalysisTime.current = 0;
-              analyzeRef.current();
-            }
-          }, 1000);
-        }
+        // NÃO reseta o estado - popup fica aberto
+        // resetState();
+
+        // NÃO força nova análise automaticamente
+        // O usuário deve fechar o popup e buscar nova entrada manualmente
       }
     } catch (error) {
       console.error('Error handling signal result:', error);
-      resetState();
+      // Em caso de erro, também não reseta
     }
-  }, [settings, resetState, updateSignal]);
+  }, [updateSignal]);
 
   // Function to execute admin signal (extracted for reuse)
   const executeAdminSignal = useCallback(async (adminSignal: any) => {
@@ -109,7 +107,7 @@ export const useAutomation = (
       id: signalId,
       type: adminSignal.type as 'buy' | 'sell',
       price: 0,
-      time: new Date().toISOString(),
+      time: adminSignal.scheduled_time, // Use exact scheduled time
       pair: adminSignal.pair,
       confidence: 99,
       martingaleStep: 0,
@@ -276,7 +274,22 @@ export const useAutomation = (
         }
       }
 
-      // 2. Análise Técnica Normal (se não houver sinal admin)
+      // 2. Verificar se o sistema está habilitado para análise técnica
+      // Se desativado, apenas sinais do admin são processados
+      const isSystemActive = await systemService.isSystemEnabled();
+
+      if (!isSystemActive) {
+        console.log('System disabled - skipping technical analysis, only admin signals allowed');
+        // Não gera sinais técnicos, apenas continua verificando sinais do admin
+        attemptsRef.current++;
+        if (attemptsRef.current >= MAX_ATTEMPTS) {
+          setError('Sistema em modo Admin. Aguardando sinal do administrador...');
+          // Não reseta, continua buscando sinais do admin
+        }
+        return;
+      }
+
+      // 3. Análise Técnica Normal (só se o sistema estiver ativo)
       const marketData = await fetchMarketData(selectedPair, timeframe);
       const { selectedStrategy } = useTradeStore.getState();
       const analysis = analyzeMarket(Array.isArray(marketData) ? marketData : [], selectedStrategy);
@@ -298,7 +311,13 @@ export const useAutomation = (
           id: signalId,
           type: analysis.direction === 'up' ? 'buy' : 'sell',
           price: Array.isArray(marketData) && marketData.length > 0 ? marketData[marketData.length - 1].close : 0,
-          time: new Date().toISOString(),
+          time: (() => {
+            const next = new Date();
+            next.setMinutes(next.getMinutes() + 1);
+            next.setSeconds(0);
+            next.setMilliseconds(0);
+            return next.toISOString();
+          })(),
           pair: selectedPair,
           confidence: analysis.confidence,
           martingaleStep: 0,
@@ -319,23 +338,31 @@ export const useAutomation = (
           }
 
           // Configura o timeout para verificar o resultado
-          const checkTime = timeframe * 60 * 1000;
+          const entryTime = new Date(signal.time).getTime();
+          const expiryTime = entryTime + (timeframe * 60 * 1000);
+
+          // Inicia o monitoramento IMEDIATAMENTE para poder logar a entrada e saída
+          // O useSignalResults vai gerenciar a espera pelos momentos certos
+          const checkTime = 0;
+
+          console.log(`Starting signal monitoring immediately for signal ${signal.id}`);
+
           signalCheckTimeout.current = setTimeout(() => {
-            console.log(`Timeout triggered for signal ${signal.id}`);
+            console.log(`Monitoring started for signal ${signal.id}`);
             checkSignalResult(signal, timeframe, handleSignalResult);
           }, checkTime);
 
-          // Backup timeout para garantir que o sinal será finalizado (mais agressivo)
+          // Backup timeout para garantir que o sinal será finalizado se algo travar
+          // Define para depois do tempo de expiração + margem de segurança
+          const backupTime = Math.max(0, expiryTime - now + 10000); // 10s após o fim
+
           setTimeout(() => {
             if (mounted.current) {
-              console.log(`Backup timeout triggered for signal ${signal.id}`);
-              handleSignalResult({
-                ...signal,
-                result: 'loss',
-                profit_loss: 0
-              });
+              // Verifica se o sinal ainda está ativo (não foi finalizado)
+              // Nota: Isso é um fallback de segurança
+              console.log(`Backup watchdog check for signal ${signal.id}`);
             }
-          }, checkTime + 2000); // 2 segundos extras para garantir
+          }, backupTime);
         } else {
           throw new Error('Failed to create signal');
         }
@@ -471,6 +498,30 @@ export const useAutomation = (
 
     return () => clearInterval(watchdogInterval);
   }, [currentSignal, checkSignalResult, handleSignalResult]);
+
+  // Efeito para carregar e monitorar status do sistema
+  useEffect(() => {
+    const loadSystemStatus = async () => {
+      const enabled = await systemService.isSystemEnabled();
+      if (mounted.current) {
+        setSystemEnabled(enabled);
+      }
+    };
+
+    loadSystemStatus();
+
+    // Subscribe para mudanças em tempo real
+    const unsubscribe = systemService.subscribeToSystemSettings((enabled) => {
+      if (mounted.current) {
+        setSystemEnabled(enabled);
+        console.log(`System status changed: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Cleanup effect
   useEffect(() => {

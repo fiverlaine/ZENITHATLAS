@@ -11,7 +11,7 @@ export const SearchingPopup: React.FC<Props> = ({ isOpen, strategyName, onCancel
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-fade-in">
             <div className="relative max-w-md w-full">
                 {/* Background Glow */}
                 <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full animate-pulse" />

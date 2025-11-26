@@ -26,8 +26,17 @@ export const ActiveSignal: React.FC<Props> = ({ signal, currentPrice }) => {
           return;
         }
 
-        const endTime = new Date(signalTime.getTime() + signal.timeframe * 60000);
         const now = new Date();
+
+        if (now < signalTime) {
+          const diffStart = signalTime.getTime() - now.getTime();
+          const minutes = Math.floor(diffStart / 60000);
+          const seconds = Math.floor((diffStart % 60000) / 1000);
+          setTimeRemaining(`Inicia em ${minutes}:${seconds.toString().padStart(2, '0')}`);
+          return;
+        }
+
+        const endTime = new Date(signalTime.getTime() + signal.timeframe * 60000);
         const diff = endTime.getTime() - now.getTime();
 
         if (diff <= 0) {
@@ -64,7 +73,6 @@ export const ActiveSignal: React.FC<Props> = ({ signal, currentPrice }) => {
   // Use primary for buy/green, red for sell/red
   const signalColorClass = isBuy ? 'text-primary' : 'text-red-500';
   const signalBgClass = isBuy ? 'bg-primary' : 'bg-red-500';
-  const signalBorderClass = isBuy ? 'border-primary' : 'border-red-500';
   const SignalIcon = isBuy ? TrendingUp : TrendingDown;
 
   const profitLoss = currentPrice && signal.price
@@ -73,70 +81,70 @@ export const ActiveSignal: React.FC<Props> = ({ signal, currentPrice }) => {
 
   return (
     <Card className={`${isBuy ? 'bg-primary/5 border-primary/30' : 'bg-red-500/5 border-red-500/30'} border-2`}>
-      <div className="flex items-start justify-between mb-4">
-        <div>
+      <div className="flex items-start justify-between mb-4 gap-2">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <div className={`${isBuy ? 'bg-primary/20' : 'bg-red-500/20'} p-2 rounded-lg`}>
-              <SignalIcon className={signalColorClass} size={24} />
+            <div className={`${isBuy ? 'bg-primary/20' : 'bg-red-500/20'} p-2 rounded-lg flex-shrink-0`}>
+              <SignalIcon className={signalColorClass} size={20} />
             </div>
-            <div>
-              <h3 className="text-2xl font-bold text-white">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-lg md:text-xl font-bold text-white truncate">
                 Operação {isBuy ? 'COMPRA' : 'VENDA'}
               </h3>
-              <p className="text-gray-400 text-sm">{signal.pair}</p>
+              <p className="text-gray-400 text-xs md:text-sm truncate">{signal.pair}</p>
             </div>
           </div>
         </div>
-        <div className={`${signalBgClass} text-black px-3 py-1 rounded-full text-sm font-bold shadow-[0_0_10px_rgba(0,0,0,0.3)]`}>
+        <div className={`${signalBgClass} text-black px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold shadow-[0_0_10px_rgba(0,0,0,0.3)] flex-shrink-0`}>
           ATIVO
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div className="bg-bg-card p-4 rounded-lg border border-white/5">
-          <div className="flex items-center text-gray-400 text-sm mb-1">
-            <DollarSign size={14} className="mr-1" />
-            Entrada
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="bg-bg-card p-3 rounded-lg border border-white/5 min-w-0">
+          <div className="flex items-center text-gray-400 text-xs mb-1 truncate">
+            <DollarSign size={12} className="mr-1 flex-shrink-0" />
+            <span className="truncate">Entrada</span>
           </div>
-          <p className="text-lg font-bold text-white">
+          <p className="text-sm md:text-base font-bold text-white break-words">
             ${(signal.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
 
         {currentPrice && (
-          <div className="bg-bg-card p-4 rounded-lg border border-white/5">
-            <div className="flex items-center text-gray-400 text-sm mb-1">
-              <DollarSign size={14} className="mr-1" />
-              Atual
+          <div className="bg-bg-card p-3 rounded-lg border border-white/5 min-w-0">
+            <div className="flex items-center text-gray-400 text-xs mb-1 truncate">
+              <DollarSign size={12} className="mr-1 flex-shrink-0" />
+              <span className="truncate">Atual</span>
             </div>
-            <p className="text-lg font-bold text-white">
+            <p className="text-sm md:text-base font-bold text-white break-words">
               ${currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
         )}
 
-        <div className="bg-bg-card p-4 rounded-lg border border-white/5">
-          <div className="flex items-center text-gray-400 text-sm mb-1">
-            <Zap size={14} className="mr-1" />
-            Confiança
+        <div className="bg-bg-card p-3 rounded-lg border border-white/5 min-w-0">
+          <div className="flex items-center text-gray-400 text-xs mb-1 truncate">
+            <Zap size={12} className="mr-1 flex-shrink-0" />
+            <span className="truncate">Confiança</span>
           </div>
-          <p className="text-lg font-bold text-white">{signal.confidence || 0}%</p>
+          <p className="text-sm md:text-base font-bold text-white break-words">{signal.confidence || 0}%</p>
         </div>
 
-        <div className="bg-bg-card p-4 rounded-lg border border-white/5">
-          <div className="flex items-center text-gray-400 text-sm mb-1">
-            <Clock size={14} className="mr-1" />
-            Tempo Restante
+        <div className="bg-bg-card p-3 rounded-lg border border-white/5 min-w-0">
+          <div className="flex items-center text-gray-400 text-xs mb-1 truncate">
+            <Clock size={12} className="mr-1 flex-shrink-0" />
+            <span className="truncate">Tempo</span>
           </div>
-          <p className="text-lg font-bold text-white">{timeRemaining}</p>
+          <p className="text-xs md:text-sm font-bold text-white break-words">{timeRemaining}</p>
         </div>
       </div>
 
       {currentPrice && profitLoss !== 0 && (
-        <div className={`p-4 rounded-lg ${profitLoss > 0 ? 'bg-primary/10 border border-primary/20' : 'bg-red-500/10 border border-red-500/20'}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-gray-400">Lucro/Prejuízo Atual</span>
-            <span className={`text-xl font-bold ${profitLoss > 0 ? 'text-primary' : 'text-red-500'}`}>
+        <div className={`p-3 md:p-4 rounded-lg ${profitLoss > 0 ? 'bg-primary/10 border border-primary/20' : 'bg-red-500/10 border border-red-500/20'}`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-gray-400 text-sm md:text-base truncate">Lucro/Prejuízo Atual</span>
+            <span className={`text-lg md:text-xl font-bold flex-shrink-0 ${profitLoss > 0 ? 'text-primary' : 'text-red-500'}`}>
               {profitLoss > 0 ? '+' : ''}{profitLoss.toFixed(2)}%
             </span>
           </div>

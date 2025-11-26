@@ -15,8 +15,8 @@ export const SimpleHeader: React.FC<Props> = ({ onShowLearn }) => {
   };
 
   return (
-    <header className="bg-bg-sidebar/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 md:ml-64 transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-4 py-4">
+    <header className="bg-bg-sidebar/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-10">
+      <div className="px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
@@ -24,32 +24,23 @@ export const SimpleHeader: React.FC<Props> = ({ onShowLearn }) => {
               <Cpu className="text-primary" size={24} />
             </div>
             <div className="ml-3">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              <h1 className="text-xl font-bold tracking-tight text-white">
                 ZENITH<span className="text-primary">ATLAS</span>
               </h1>
-              <p className="text-[10px] sm:text-xs text-gray-400">
+              <p className="text-[10px] text-gray-400">
                 Sistema Inteligente de Trading
               </p>
             </div>
           </div>
 
-          {/* Ações */}
+          {/* Ações - Sempre mostra ícones (mobile mode) */}
           {session && (
             <div className="flex items-center gap-2">
               <Button
                 onClick={onShowLearn}
                 variant="secondary"
                 icon={<BookOpen size={16} />}
-                className="hidden sm:flex hover:border-primary/50 hover:text-primary transition-colors"
-              >
-                Guia
-              </Button>
-
-              <Button
-                onClick={onShowLearn}
-                variant="secondary"
-                icon={<BookOpen size={16} />}
-                className="sm:hidden !p-2 hover:border-primary/50 hover:text-primary transition-colors"
+                className="!p-2 hover:border-primary/50 hover:text-primary transition-colors"
               >
                 <span className="sr-only">Guia</span>
               </Button>
@@ -58,16 +49,7 @@ export const SimpleHeader: React.FC<Props> = ({ onShowLearn }) => {
                 onClick={handleSignOut}
                 variant="secondary"
                 icon={<LogOut size={16} />}
-                className="hidden sm:flex hover:border-red-500/50 hover:text-red-500 transition-colors"
-              >
-                Sair
-              </Button>
-
-              <Button
-                onClick={handleSignOut}
-                variant="secondary"
-                icon={<LogOut size={16} />}
-                className="sm:hidden !p-2 hover:border-red-500/50 hover:text-red-500 transition-colors"
+                className="!p-2 hover:border-red-500/50 hover:text-red-500 transition-colors"
               >
                 <span className="sr-only">Sair</span>
               </Button>

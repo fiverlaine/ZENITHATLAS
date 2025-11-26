@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { signalService } from '../../services/signalService';
+import { systemService } from '../../services/systemService';
 import { supabase } from '../../services/supabase';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Trash2, Plus, LogOut } from 'lucide-react';
+import { Trash2, Plus, LogOut, Power, Loader2 } from 'lucide-react';
 
 export const AdminPanel: React.FC = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [signals, setSignals] = useState<any[]>([]);
+    const [systemEnabled, setSystemEnabled] = useState(true);
+    const [loadingSystem, setLoadingSystem] = useState(false);
     const [newSignal, setNewSignal] = useState({
         pair: 'BTC/USDT',
         type: 'buy',
@@ -22,9 +25,10 @@ export const AdminPanel: React.FC = () => {
         if (savedAuth === 'true') {
             setIsLoggedIn(true);
             fetchSignals();
+            fetchSystemStatus();
 
-            // Subscribe to realtime changes
-            const channel = supabase
+            // Subscribe to realtime changes - sinais
+            const signalsChannel = supabase
                 .channel('admin_signals_changes')
                 .on('postgres_changes', {
                     event: '*',
@@ -35,11 +39,34 @@ export const AdminPanel: React.FC = () => {
                 })
                 .subscribe();
 
+            // Subscribe to realtime changes - system settings
+            const unsubscribeSystem = systemService.subscribeToSystemSettings((enabled) => {
+                setSystemEnabled(enabled);
+            });
+
             return () => {
-                supabase.removeChannel(channel);
+                supabase.removeChannel(signalsChannel);
+                unsubscribeSystem();
             };
         }
     }, []);
+
+    const fetchSystemStatus = async () => {
+        const enabled = await systemService.isSystemEnabled();
+        setSystemEnabled(enabled);
+    };
+
+    const handleToggleSystem = async () => {
+        setLoadingSystem(true);
+        const newStatus = !systemEnabled;
+        const success = await systemService.setSystemEnabled(newStatus);
+        if (success) {
+            setSystemEnabled(newStatus);
+        } else {
+            alert('Erro ao atualizar status do sistema');
+        }
+        setLoadingSystem(false);
+    };
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -71,6 +98,8 @@ export const AdminPanel: React.FC = () => {
 
         // Converter para ISO string com timezone correto
         const date = new Date(newSignal.scheduled_time);
+        date.setSeconds(0);
+        date.setMilliseconds(0);
         const isoString = date.toISOString();
 
         const result = await signalService.createAdminSignal({
@@ -137,6 +166,59 @@ export const AdminPanel: React.FC = () => {
                         <LogOut size={16} /> Sair
                     </Button>
                 </div>
+
+                {/* Card de Controle do Sistema */}
+                <Card className={`p-6 border-2 transition-all ${systemEnabled
+                    ? 'bg-gradient-to-r from-green-500/10 to-green-500/5 border-green-500/30'
+                    : 'bg-gradient-to-r from-red-500/10 to-red-500/5 border-red-500/30'
+                    }`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-xl ${systemEnabled ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                                <Power size={28} className={systemEnabled ? 'text-green-500' : 'text-red-500'} />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white">Sistema de Sinais</h2>
+                                <p className="text-sm text-gray-400">
+                                    {systemEnabled
+                                        ? 'Ativo - Gerando sinais técnicos + sinais admin'
+                                        : 'Desativado - Apenas sinais do admin'
+                                    }
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleToggleSystem}
+                            disabled={loadingSystem}
+                            className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 focus:outline-none ${systemEnabled ? 'bg-green-500' : 'bg-red-500'
+                                } ${loadingSystem ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        >
+                            {loadingSystem ? (
+                                <Loader2 className="w-5 h-5 text-white animate-spin mx-auto" />
+                            ) : (
+                                <span
+                                    className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-300 ${systemEnabled ? 'translate-x-9' : 'translate-x-1'
+                                        }`}
+                                />
+                            )}
+                        </button>
+                    </div>
+
+                    <div className={`mt-4 p-3 rounded-lg ${systemEnabled ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                        <p className="text-xs text-gray-300">
+                            {systemEnabled ? (
+                                <>
+                                    <span className="font-bold text-green-400">✓ Sistema Completo:</span> Todos os usuários podem gerar sinais usando as estratégias técnicas (Protocolo V4, Momentum Alpha, etc.) além dos sinais agendados pelo admin.
+                                </>
+                            ) : (
+                                <>
+                                    <span className="font-bold text-red-400">⚠ Modo Admin:</span> Apenas os sinais agendados neste painel serão enviados aos usuários. As estratégias técnicas estão desativadas.
+                                </>
+                            )}
+                        </p>
+                    </div>
+                </Card>
 
                 <Card className="p-6 bg-bg-card border-white/10">
                     <h2 className="text-xl font-bold mb-4 flex items-center gap-2">

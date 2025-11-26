@@ -42,7 +42,7 @@ export const SettingsDialog: React.FC<Props> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-bg-card rounded-xl border border-white/5 w-full max-w-lg animate-fade-in max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         <div className="p-4 sm:p-6 border-b border-white/5">
           <div className="flex items-center gap-2">

@@ -13,6 +13,7 @@ import { Play, Settings2, Zap } from 'lucide-react';
 export const Dashboard: React.FC = () => {
   const {
     currentSignal,
+    setCurrentSignal,
     isAutomated,
     setAutomated,
     selectedPair,
@@ -91,6 +92,14 @@ export const Dashboard: React.FC = () => {
       const startTime = new Date(currentSignal.time).getTime();
       const endTime = startTime + (currentSignal.timeframe * 60 * 1000);
       const now = Date.now();
+      if (now < startTime) {
+        const diffStart = startTime - now;
+        const minutes = Math.floor(diffStart / 60000);
+        const seconds = Math.floor((diffStart % 60000) / 1000);
+        setRemainingTime(`Início em ${minutes}:${seconds.toString().padStart(2, '0')}`);
+        return;
+      }
+
       const diff = endTime - now;
 
       if (diff <= 0) {
@@ -121,7 +130,12 @@ export const Dashboard: React.FC = () => {
       <SignalPopup
         isOpen={showSignalPopup}
         signal={currentSignal}
-        onClose={() => setShowSignalPopup(false)}
+        currentPrice={currentPrice}
+        strategyId={selectedStrategy}
+        onClose={() => {
+          setShowSignalPopup(false);
+          setCurrentSignal(null); // Limpa o sinal ao fechar
+        }}
       />
 
       {/* Popup de Busca */}
@@ -178,7 +192,7 @@ export const Dashboard: React.FC = () => {
           ) : currentSignal ? (
             <>
               <Zap />
-              Finalizando entrada em {remainingTime}
+              {remainingTime}
             </>
           ) : (
             <>

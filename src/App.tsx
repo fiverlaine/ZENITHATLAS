@@ -102,47 +102,56 @@ export default function App() {
 
   // Main app
   return (
-    <div className="min-h-screen flex flex-col bg-bg-body text-white">
-      <SimpleHeader onShowLearn={() => setShowLearn(!showLearn)} />
+    <div className="flex h-screen overflow-hidden bg-black">
+      {/* Left Side - QuantumTrade App (Mobile View) */}
+      <div className="w-full max-w-[450px] flex-shrink-0 border-r border-gray-800 flex flex-col bg-bg-body relative z-10">
+        <SimpleHeader onShowLearn={() => setShowLearn(!showLearn)} />
 
-      {/* Desktop Sidebar */}
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+        <main className="flex-1 overflow-y-auto scrollbar-hide">
+          <div className="px-4 py-6 space-y-6">
+            {initError ? (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-500">
+                <p>{initError}</p>
+              </div>
+            ) : showLearn ? (
+              <div className="space-y-6">
+                <button
+                  onClick={() => setShowLearn(false)}
+                  className="text-green-500 hover:text-green-400 transition-colors flex items-center gap-2"
+                >
+                  ← Voltar ao Dashboard
+                </button>
+                <Learn />
+              </div>
+            ) : (
+              <>
+                {currentView === 'home' && <Dashboard />}
+                {currentView === 'analytics' && <Analytics />}
+                {currentView === 'history' && <History />}
+              </>
+            )}
+          </div>
+        </main>
 
-      <main className="flex-1 overflow-hidden md:ml-64 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-          {initError ? (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-500">
-              <p>{initError}</p>
-            </div>
-          ) : showLearn ? (
-            <div className="space-y-6">
-              <button
-                onClick={() => setShowLearn(false)}
-                className="text-green-500 hover:text-green-400 transition-colors flex items-center gap-2"
-              >
-                ← Voltar ao Dashboard
-              </button>
-              <Learn />
-            </div>
-          ) : (
-            <>
-              {currentView === 'home' && <Dashboard />}
-              {currentView === 'analytics' && <Analytics />}
-              {currentView === 'history' && <History />}
-            </>
-          )}
-        </div>
-      </main>
+        {/* Bottom Navigation - apenas quando não está na tela Learn */}
+        {!showLearn && (
+          <BottomNav
+            currentView={currentView}
+            onViewChange={setCurrentView}
+          />
+        )}
+      </div>
 
-      {/* Bottom Navigation - apenas quando não está na tela Learn */}
-      {!showLearn && (
-        <BottomNav
-          currentView={currentView}
-          onViewChange={setCurrentView}
+      {/* Right Side - Broker Iframe */}
+      <div className="flex-1 bg-[#131722] relative">
+        <iframe
+          src="https://app.vsbroker.io/auth/register"
+          className="w-full h-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          title="Broker Interface"
         />
-      )}
-
-      <Footer />
+      </div>
     </div>
   );
 }

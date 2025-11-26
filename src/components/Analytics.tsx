@@ -161,31 +161,31 @@ export const Analytics: React.FC = () => {
       />
 
       {/* Métricas Adicionais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-primary text-sm font-medium">Lucro Total</p>
-              <p className="text-2xl font-bold text-white">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 min-w-0 overflow-hidden">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-primary text-xs md:text-sm font-medium truncate">Lucro Total</p>
+              <p className="text-base sm:text-lg md:text-xl font-bold text-white break-words">
                 {totalProfit > 0 ? '+' : ''}{totalProfit.toFixed(2)}%
               </p>
             </div>
-            <div className="bg-primary/20 p-3 rounded-xl">
-              <TrendingUp className="text-primary" size={24} />
+            <div className="bg-primary/20 p-2 md:p-3 rounded-xl flex-shrink-0">
+              <TrendingUp className="text-primary" size={20} />
             </div>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-white/10 to-white/5 border-white/10">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm font-medium">Operações Ativas</p>
-              <p className="text-2xl font-bold text-white">
+        <Card className="bg-gradient-to-br from-white/10 to-white/5 border-white/10 min-w-0 overflow-hidden">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-gray-400 text-xs md:text-sm font-medium truncate">Operações Ativas</p>
+              <p className="text-base sm:text-lg md:text-xl font-bold text-white break-words">
                 {filteredSignals.filter(s => !s.result).length}
               </p>
             </div>
-            <div className="bg-white/10 p-3 rounded-xl">
-              <Activity className="text-white" size={24} />
+            <div className="bg-white/10 p-2 md:p-3 rounded-xl flex-shrink-0">
+              <Activity className="text-white" size={20} />
             </div>
           </div>
         </Card>
@@ -208,31 +208,31 @@ export const Analytics: React.FC = () => {
             {pairStats.map((stat) => (
               <div
                 key={stat.pair}
-                className="bg-white/5 rounded-lg p-4 border border-white/5"
+                className="bg-white/5 rounded-lg p-3 md:p-4 border border-white/5 min-w-0 overflow-hidden"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-white">{stat.pair}</h4>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-gray-400">{stat.total} operações</span>
-                    <span className={`font-medium ${stat.winRate >= 50 ? 'text-primary' : 'text-red-500'
+                <div className="flex items-center justify-between mb-3 gap-2">
+                  <h4 className="text-base md:text-lg font-semibold text-white truncate">{stat.pair}</h4>
+                  <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm flex-shrink-0">
+                    <span className="text-gray-400 truncate">{stat.total} ops</span>
+                    <span className={`font-medium truncate ${stat.winRate >= 50 ? 'text-primary' : 'text-red-500'
                       }`}>
-                      {stat.winRate.toFixed(1)}% acerto
+                      {stat.winRate.toFixed(1)}%
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-primary text-sm">Vitórias</p>
-                    <p className="text-lg font-bold text-white">{stat.wins}</p>
+                <div className="grid grid-cols-3 gap-2 md:gap-4 text-center">
+                  <div className="min-w-0">
+                    <p className="text-primary text-xs md:text-sm truncate">Vitórias</p>
+                    <p className="text-sm md:text-base font-bold text-white break-words">{stat.wins}</p>
                   </div>
-                  <div>
-                    <p className="text-red-400 text-sm">Perdas</p>
-                    <p className="text-lg font-bold text-white">{stat.losses}</p>
+                  <div className="min-w-0">
+                    <p className="text-red-400 text-xs md:text-sm truncate">Perdas</p>
+                    <p className="text-sm md:text-base font-bold text-white break-words">{stat.losses}</p>
                   </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Lucro</p>
-                    <p className={`text-lg font-bold ${stat.profit > 0 ? 'text-primary' : 'text-red-500'
+                  <div className="min-w-0">
+                    <p className="text-gray-400 text-xs md:text-sm truncate">Lucro</p>
+                    <p className={`text-xs md:text-sm font-bold break-words ${stat.profit > 0 ? 'text-primary' : 'text-red-500'
                       }`}>
                       {stat.profit > 0 ? '+' : ''}{stat.profit.toFixed(2)}%
                     </p>
