@@ -7,6 +7,8 @@ export const signalService = {
     id?: string;
     martingaleStep?: number;
     martingaleMultiplier?: number;
+    confluences?: string[];
+    strategyName?: string;
   }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -32,7 +34,9 @@ export const signalService = {
         martingale_multiplier: signal.martingaleMultiplier || 1.0,
         time: signal.time,
         processing_status: 'pending',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        confluences: signal.confluences || [],
+        strategy_name: signal.strategyName || ''
       };
 
       // Retry the operation up to 3 times with exponential backoff
@@ -74,7 +78,9 @@ export const signalService = {
           id: data.id,
           time: data.time,
           martingaleStep: data.martingale_step,
-          martingaleMultiplier: data.martingale_multiplier
+          martingaleMultiplier: data.martingale_multiplier,
+          confluences: data.confluences,
+          strategyName: data.strategy_name
         };
       }, 3, 1000);
     } catch (error) {
@@ -115,7 +121,9 @@ export const signalService = {
         time: signal.time || new Date().toISOString(),
         timeframe: Number(signal.timeframe) || 1,
         martingaleStep: Number(signal.martingale_step) || 0,
-        martingaleMultiplier: Number(signal.martingale_multiplier) || 1.0
+        martingaleMultiplier: Number(signal.martingale_multiplier) || 1.0,
+        confluences: signal.confluences || [],
+        strategyName: signal.strategy_name || ''
       }));
     } catch (error) {
       console.error('Error loading pending signals:', error);
@@ -154,7 +162,9 @@ export const signalService = {
         time: signal.time || new Date().toISOString(),
         timeframe: Number(signal.timeframe) || 1,
         martingaleStep: Number(signal.martingale_step) || 0,
-        martingaleMultiplier: Number(signal.martingale_multiplier) || 1.0
+        martingaleMultiplier: Number(signal.martingale_multiplier) || 1.0,
+        confluences: signal.confluences || [],
+        strategyName: signal.strategy_name || ''
       }));
     } catch (error) {
       console.error('Error fetching all signals:', error);
@@ -194,7 +204,9 @@ export const signalService = {
           time: data.time || new Date().toISOString(),
           timeframe: Number(data.timeframe) || 1,
           martingaleStep: Number(data.martingale_step) || 0,
-          martingaleMultiplier: Number(data.martingale_multiplier) || 1.0
+          martingaleMultiplier: Number(data.martingale_multiplier) || 1.0,
+          confluences: data.confluences || [],
+          strategyName: data.strategy_name || ''
         };
       }
 

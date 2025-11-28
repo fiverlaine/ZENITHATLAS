@@ -10,6 +10,8 @@ export interface Signal {
   result?: 'win' | 'loss';
   profit_loss?: number;
   timeframe: number;
+  confluences?: string[];
+  strategyName?: string;
 }
 
 export interface Position extends Signal {

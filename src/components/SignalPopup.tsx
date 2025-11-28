@@ -1,43 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Signal } from '../types/trading';
-import { ArrowUpCircle, ArrowDownCircle, X, Target, Clock, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, X, Target, Clock, Loader2, TrendingUp } from 'lucide-react';
 
 interface Props {
     isOpen: boolean;
     signal: Signal | null;
     onClose: () => void;
-    strategyId?: string;
 }
 
-// Informações técnicas por estratégia
-const STRATEGY_INFO: Record<string, { name: string; indicators: string[] }> = {
-    'protocolo_v4': {
-        name: 'Protocolo V4',
-        indicators: ['Bollinger Bands', 'RSI', 'StochRSI', 'EMA 200']
-    },
-    'momentum_alpha': {
-        name: 'Momentum Alpha',
-        indicators: ['MACD', 'RSI', 'ADX', 'Histograma']
-    },
-    'trend_surfer': {
-        name: 'Trend Surfer',
-        indicators: ['EMA 9/21', 'EMA 200', 'ADX']
-    },
-    'cci_reversal': {
-        name: 'CCI Reversal',
-        indicators: ['CCI', 'Oversold/Overbought']
-    },
-    'williams_r': {
-        name: 'Williams %R',
-        indicators: ['Williams %R', 'Reversal']
-    },
-    'mfi_reversal': {
-        name: 'MFI Reversal',
-        indicators: ['MFI', 'Money Flow']
-    }
-};
 
-export const SignalPopup: React.FC<Props> = ({ isOpen, signal, onClose, strategyId }) => {
+
+export const SignalPopup: React.FC<Props> = ({ isOpen, signal, onClose }) => {
     const [timeLeft, setTimeLeft] = useState<string>('');
     const [status, setStatus] = useState<'waiting' | 'active' | 'finished' | 'loading'>('waiting');
     const [finalResult, setFinalResult] = useState<'WIN' | 'LOSS' | null>(null);
@@ -136,7 +109,6 @@ export const SignalPopup: React.FC<Props> = ({ isOpen, signal, onClose, strategy
 
     const isBuy = signal.type === 'buy';
     const isWin = finalResult === 'WIN';
-    const strategyInfo = strategyId ? STRATEGY_INFO[strategyId] : null;
 
     return (
         <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-start justify-center p-4 pt-6 overflow-y-auto animate-fade-in">
@@ -313,25 +285,72 @@ export const SignalPopup: React.FC<Props> = ({ isOpen, signal, onClose, strategy
                             </div>
 
                             {/* Informações Técnicas da Estratégia */}
-                            {strategyInfo && (
-                                <div className="w-full bg-white/5 rounded-xl p-3 border border-white/10 mb-3">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <TrendingUp size={14} className="text-primary" />
-                                        <span className="text-xs font-bold text-gray-300">Análise Técnica</span>
+                            {(signal.confluences && signal.confluences.length > 0) && (
+                                <div className="w-full bg-white/5 rounded-xl p-3 border border-white/10 mb-3 text-left">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <TrendingUp size={14} className="text-primary" />
+                                            <span className="text-xs font-bold text-gray-300">Análise Técnica</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                                            <Target size={10} className="text-primary" />
+                                            <span className="text-[10px] font-bold text-primary">
+                                                {signal.confidence}% Confiança
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {strategyInfo.indicators.map((indicator, idx) => (
+
+                                    <div className="flex flex-wrap gap-1.5 mb-3">
+                                        {signal.confluences.map((confluence, idx) => (
                                             <span
                                                 key={idx}
-                                                className="px-2 py-0.5 bg-primary/10 border border-primary/30 rounded text-xs text-primary"
+                                                className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[10px] text-gray-300"
                                             >
-                                                {indicator}
+                                                {confluence}
                                             </span>
                                         ))}
                                     </div>
-                                    <p className="text-[10px] text-gray-500 mt-2">
-                                        Estratégia: {strategyInfo.name}
-                                    </p>
+
+                                    <div className="pt-2 border-t border-white/10">
+                                        <p className="text-[10px] text-gray-500 mb-1 uppercase tracking-wider font-bold">Explicação da Entrada</p>
+                                        <p className="text-xs text-gray-300 leading-relaxed">
+                                            {(() => {
+                                                const isBuy = signal.type === 'buy';
+                                                const confluences = signal.confluences || [];
+                                                let explanation = isBuy
+                                                    ? 'Oportunidade de COMPRA identificada. '
+                                                    : 'Oportunidade de VENDA identificada. ';
+
+                                                if (confluences.some(c => c.includes('Institucional') || c.includes('Smart Money'))) {
+                                                    explanation += 'Algoritmos detectaram movimentação atípica de grandes players (Smart Money), indicando alta probabilidade de movimento direcional. ';
+                                                }
+
+                                                if (confluences.some(c => c.includes('RSI') || c.includes('Stoch') || c.includes('MFI'))) {
+                                                    explanation += isBuy
+                                                        ? 'O ativo está descontado (sobrevenda), sugerindo reversão para alta. '
+                                                        : 'O ativo está esticado (sobrecompra), sugerindo correção. ';
+                                                }
+
+                                                if (confluences.some(c => c.includes('Banda') || c.includes('EMA') || c.includes('Suporte') || c.includes('Resistência'))) {
+                                                    explanation += 'O preço testou uma região importante de suporte/resistência ou média móvel. ';
+                                                }
+
+                                                if (confluences.some(c => c.includes('MACD') || c.includes('Tendência') || c.includes('ADX') || c.includes('Cruzamento'))) {
+                                                    explanation += isBuy
+                                                        ? 'Indicadores de tendência e momentum confirmam a força compradora.'
+                                                        : 'Indicadores de tendência e momentum confirmam a pressão vendedora.';
+                                                }
+
+                                                return explanation;
+                                            })()}
+                                        </p>
+                                    </div>
+
+                                    {signal.strategyName && (
+                                        <p className="text-[10px] text-gray-600 mt-2 text-right italic">
+                                            {signal.strategyName}
+                                        </p>
+                                    )}
                                 </div>
                             )}
 

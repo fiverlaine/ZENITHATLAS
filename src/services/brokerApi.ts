@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const SYMBOL_PRICES_API = 'https://symbol-prices-api.mybroker.dev';
 const API_KEY = 'Sl293kk22ss8';
-const PARTNER = 'mybroker';
+const PARTNER = 'vsbroker';
 
 const api = axios.create({
     baseURL: SYMBOL_PRICES_API,
@@ -92,10 +92,10 @@ export const brokerApi = {
             if (data && typeof data === 'object' && 'closePrice' in data) {
                 const price = Number(data.closePrice);
                 console.log(`✅ Price at ${new Date(timestamp).toISOString()}: ${price}`);
-                
+
                 // Salva no cache
                 priceCache.set(cacheKey, { price, timestamp: Date.now() });
-                
+
                 return price;
             }
 

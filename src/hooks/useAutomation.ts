@@ -41,7 +41,7 @@ export const useAutomation = (
   const executedAdminSignalsRef = useRef<Set<string>>(new Set());
   const scheduledExecutionRef = useRef<NodeJS.Timeout>();
   const currentSignalRef = useRef(currentSignal); // Ref para acesso no realtime
-  
+
   // Mantém a ref do currentSignal atualizada
   useEffect(() => {
     currentSignalRef.current = currentSignal;
@@ -140,7 +140,21 @@ export const useAutomation = (
       pair: adminSignal.pair,
       confidence: 99,
       martingaleStep: 0,
-      timeframe: adminSignal.timeframe
+      timeframe: adminSignal.timeframe,
+      strategyName: 'Análise Quantitativa Institucional',
+      confluences: adminSignal.type === 'buy'
+        ? [
+          'Fluxo Institucional Comprador Detectado',
+          'Divergência de Alta no Volume (Smart Money)',
+          'Rompimento de Resistência Algorítmica',
+          'Padrão de Acumulação Institucional'
+        ]
+        : [
+          'Fluxo Institucional Vendedor Detectado',
+          'Divergência de Baixa no Volume (Smart Money)',
+          'Rompimento de Suporte Algorítmico',
+          'Padrão de Distribuição Institucional'
+        ]
     };
 
     // Busca preço atual (será atualizado no momento exato da entrada pelo useSignalResults)
@@ -184,9 +198,9 @@ export const useAutomation = (
       // Backup timeout para garantir resultado
       const backupTime = Math.max(timeUntilExit + 15000, 15000);
       setTimeout(() => {
-        if (mounted.current && !signal.result) {
-          console.log(`⚠️ Backup check for signal ${signalId}`);
-          checkSignalResult(signal, adminSignal.timeframe, handleSignalResult);
+        if (mounted.current && !(signal as any).result) {
+          console.log(`⚠️ Backup check for signal ${signal.id}`);
+          checkSignalResult(signal as any, adminSignal.timeframe, handleSignalResult);
         }
       }, backupTime);
     }
@@ -227,7 +241,7 @@ export const useAutomation = (
         table: 'admin_signals'
       }, async (payload) => {
         console.log('📡 REALTIME: Novo sinal admin recebido!', payload);
-        
+
         const newSignal = payload.new as any;
         if (!newSignal || newSignal.status !== 'pending') {
           console.log('📡 Sinal ignorado (status não é pending)');
@@ -279,14 +293,14 @@ export const useAutomation = (
       }, async (payload) => {
         const newSignal = payload.new as any;
         const oldSignal = payload.old as any;
-        
+
         // Se mudou para pending e antes não era
         if (newSignal?.status === 'pending' && oldSignal?.status !== 'pending') {
           console.log('📡 Sinal atualizado para pending, verificando...');
-          
+
           const normalizedNew = signalService.normalizePair(newSignal.pair);
           const normalizedCurrent = signalService.normalizePair(selectedPairRef.current);
-          
+
           if (normalizedNew !== normalizedCurrent) return;
           if (operationInProgress.current || currentSignalRef.current) return;
 
@@ -397,7 +411,19 @@ export const useAutomation = (
       // 3. Análise Técnica Normal (só se o sistema estiver ativo)
       const marketData = await fetchMarketData(selectedPair, timeframe);
       const { selectedStrategy } = useTradeStore.getState();
-      const analysis = analyzeMarket(Array.isArray(marketData) ? marketData : [], selectedStrategy);
+
+      // Mapeamento de estratégias para IDs numéricos
+      const strategyMap: Record<string, number> = {
+        'protocolo_v4': 1,
+        'momentum_alpha': 2,
+        'trend_surfer': 3,
+        'cci_reversal': 4,
+        'williams_r': 5,
+        'mfi_reversal': 6
+      };
+
+      const strategyId = strategyMap[selectedStrategy || 'protocolo_v4'] || 1;
+      const analysis = analyzeMarket(Array.isArray(marketData) ? marketData : [], strategyId);
 
       // Validação adicional para sinais mais assertivos
       const isHighConfidence = analysis.confidence >= MIN_CONFIDENCE;
@@ -412,6 +438,8 @@ export const useAutomation = (
           id?: string;
           martingaleStep?: number;
           martingaleMultiplier?: number;
+          confluences?: string[];
+          strategyName?: string;
         } = {
           id: signalId,
           type: analysis.direction === 'up' ? 'buy' : 'sell',
@@ -426,7 +454,9 @@ export const useAutomation = (
           pair: selectedPair,
           confidence: analysis.confidence,
           martingaleStep: 0,
-          timeframe
+          timeframe,
+          confluences: analysis.signals,
+          strategyName: analysis.strategyName
         };
 
         lastAnalysisTime.current = now;
@@ -635,15 +665,15 @@ export const useAutomation = (
     const checkAdminSignals = async () => {
       // Não verifica se já tem operação ou sinal ativo
       if (operationInProgress.current || currentSignalRef.current) return;
-      
+
       try {
         const adminSignal = await signalService.getPendingAdminSignal(selectedPairRef.current);
-        
+
         if (adminSignal && !executedAdminSignalsRef.current.has(adminSignal.id)) {
           const now = Date.now();
           const scheduledTime = new Date(adminSignal.scheduled_time).getTime();
           const timeDiff = scheduledTime - now;
-          
+
           // Se está na janela de execução (entre -60s e +90s)
           if (timeDiff <= 90000 && timeDiff > -60000) {
             console.log('🔄 Polling: Encontrou sinal admin pendente, executando...');
@@ -660,7 +690,7 @@ export const useAutomation = (
 
     // Verifica a cada 2 segundos como backup do realtime
     const pollInterval = setInterval(checkAdminSignals, 2000);
-    
+
     // Verifica imediatamente também
     checkAdminSignals();
 

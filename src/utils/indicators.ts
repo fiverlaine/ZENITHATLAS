@@ -169,257 +169,203 @@ export const calculateMFI = (high: number[], low: number[], close: number[], vol
   );
 };
 
-export const analyzeMarket = (data: any[], strategy: string = 'protocolo_v4') => {
+export interface AnalysisResult {
+  confidence: number;
+  signals: string[]; // Lista de confluências (ex: "RSI Oversold", "MACD Bullish")
+  direction: 'up' | 'down' | 'neutral';
+  strategyName: string;
+  indicators: any;
+  levels: any;
+}
+
+export const analyzeMarket = (data: any[], strategyId: number = 1): AnalysisResult => {
   if (!data || !Array.isArray(data)) {
     throw new Error('Dados inválidos para análise');
   }
 
-  if (data.length < 50) { // Aumentado para garantir dados suficientes para EMA 50/100
+  if (data.length < 50) {
     throw new Error('Dados insuficientes para análise (mínimo 50 períodos)');
   }
 
   try {
-    // Validar e extrair preços
-    const prices = data.map((candle, index) => {
-      const close = Number(candle.close);
-      if (isNaN(close) || close <= 0) {
-        throw new Error(`Preço de fechamento inválido detectado no candle ${index + 1}`);
-      }
-      return close;
-    });
-
-    const highs = data.map((candle, index) => {
-      const high = Number(candle.high);
-      if (isNaN(high) || high <= 0) {
-        throw new Error(`Preço máximo inválido detectado no candle ${index + 1}`);
-      }
-      return high;
-    });
-
-    const lows = data.map((candle, index) => {
-      const low = Number(candle.low);
-      if (isNaN(low) || low <= 0) {
-        throw new Error(`Preço mínimo inválido detectado no candle ${index + 1}`);
-      }
-      return low;
-    });
-
-    const volumes = data.map((candle, index) => {
-      const vol = Number(candle.volume);
-      return isNaN(vol) ? 0 : vol;
-    });
+    // Extração de dados
+    const prices = data.map(c => Number(c.close));
+    const highs = data.map(c => Number(c.high));
+    const lows = data.map(c => Number(c.low));
+    const volumes = data.map(c => Number(c.volume));
 
     const lastCandle = data[data.length - 1];
-    if (!lastCandle) {
-      throw new Error('Último candle não encontrado');
-    }
+    const lastPrice = prices[prices.length - 1];
 
-    const pivotPoints = calculatePivotPoints(
-      lastCandle.high,
-      lastCandle.low,
-      lastCandle.close
-    );
-
-    const supportResistanceLevels = findSupportResistanceLevels(data);
-
-    // Indicadores comuns
+    // Cálculos de Indicadores
     const rsi = calculateRSI(prices);
-    const ema9 = calculateEMA(prices, 9);
-    const ema20 = calculateEMA(prices, 20);
-    const ema21 = calculateEMA(prices, 21);
-    const ema50 = calculateEMA(prices, 50);
-
-    // EMA 100 e 200 requerem mais dados
-    const ema100 = prices.length >= 100 ? calculateEMA(prices, 100) : Array(prices.length).fill(prices[prices.length - 1]);
-    const ema200 = prices.length >= 200 ? calculateEMA(prices, 200) : Array(prices.length).fill(prices[prices.length - 1]);
-
-    const macd = calculateMACD(prices);
     const bb = calculateBollingerBands(prices);
+    const macd = calculateMACD(prices);
+    const ema20 = calculateEMA(prices, 20);
+    const ema50 = calculateEMA(prices, 50);
+    const ema200 = prices.length >= 200 ? calculateEMA(prices, 200) : Array(prices.length).fill(prices[prices.length - 1]);
     const stochRsi = calculateStochasticRSI(prices);
     const adx = calculateADX(highs, lows, prices);
-    const cci = calculateCCI(highs, lows, prices);
-    const williamsR = calculateWilliamsR(highs, lows, prices);
     const mfi = calculateMFI(highs, lows, prices, volumes);
 
-    const lastPrice = prices[prices.length - 1];
+    // Valores atuais
     const lastRSI = rsi[rsi.length - 1];
-    const lastEMA9 = ema9[ema9.length - 1];
-    const lastEMA20 = ema20[ema20.length - 1];
-    const lastEMA21 = ema21[ema21.length - 1];
-    const lastEMA50 = ema50[ema50.length - 1];
-    const lastEMA100 = ema100[ema100.length - 1];
-    const lastEMA200 = ema200[ema200.length - 1];
-    const lastMACD = macd[macd.length - 1];
     const lastBB = bb[bb.length - 1];
-    const lastStochRSI = stochRsi[stochRsi.length - 1];
+    const lastMACD = macd[macd.length - 1];
+    const lastEMA200 = ema200[ema200.length - 1];
+    const lastStoch = stochRsi[stochRsi.length - 1];
     const lastADX = adx[adx.length - 1];
-    const lastCCI = cci[cci.length - 1];
-    const lastWilliamsR = williamsR[williamsR.length - 1];
     const lastMFI = mfi[mfi.length - 1];
 
-    if (isNaN(lastPrice)) {
-      throw new Error('Valores inválidos nos indicadores');
-    }
-
-    const signals: string[] = [];
     let direction: 'up' | 'down' | 'neutral' = 'neutral';
-    let confidence = 50;
 
-    // Lógica das Estratégias
-    switch (strategy) {
-      case 'momentum_alpha':
-        // Estratégia 2: Momentum Alpha (MACD + RSI + ADX)
-        // Compra: MACD > Signal + RSI > 50 + ADX > 20 + Histograma Positivo
-        if (lastMACD.MACD > lastMACD.signal && lastRSI > 50 && lastADX.adx > 20 && lastMACD.histogram > 0) {
-          signals.push('MACD Cruzamento Alta + RSI Bullish + Momentum Forte');
-          confidence = 85;
-          direction = 'up';
-        }
-        // Venda: MACD < Signal + RSI < 50 + ADX > 20 + Histograma Negativo
-        else if (lastMACD.MACD < lastMACD.signal && lastRSI < 50 && lastADX.adx > 20 && lastMACD.histogram < 0) {
-          signals.push('MACD Cruzamento Baixa + RSI Bearish + Momentum Forte');
-          confidence = 85;
-          direction = 'down';
-        }
+    // --- Definição das Confluências ---
+    const buySignals: string[] = [];
+    const sellSignals: string[] = [];
+
+    // 1. RSI (Reversal)
+    const rsiBuy = lastRSI < 35;
+    const rsiSell = lastRSI > 65;
+    if (rsiBuy) buySignals.push(`RSI em Sobrevenda (${lastRSI.toFixed(2)})`);
+    if (rsiSell) sellSignals.push(`RSI em Sobrecompra (${lastRSI.toFixed(2)})`);
+
+    // 2. Bollinger Bands (Reversal)
+    // Relaxando levemente a condição para "próximo da banda" (0.1%)
+    const bbLowerThreshold = lastBB.lower * 1.001;
+    const bbUpperThreshold = lastBB.upper * 0.999;
+    const bbBuy = lastPrice <= bbLowerThreshold;
+    const bbSell = lastPrice >= bbUpperThreshold;
+    if (bbBuy) buySignals.push('Preço próximo/tocou Banda Inferior');
+    if (bbSell) sellSignals.push('Preço próximo/tocou Banda Superior');
+
+    // 3. MACD (Momentum)
+    const macdBuy = lastMACD.histogram > 0 && lastMACD.MACD > lastMACD.signal;
+    const macdSell = lastMACD.histogram < 0 && lastMACD.MACD < lastMACD.signal;
+    if (macdBuy) buySignals.push('MACD Cruzamento Bullish');
+    if (macdSell) sellSignals.push('MACD Cruzamento Bearish');
+
+    // 4. EMA Trend (Trend Following)
+    const trendBuy = lastPrice > lastEMA200;
+    const trendSell = lastPrice < lastEMA200;
+    if (trendBuy) buySignals.push('Tendência de Alta (Acima EMA200)');
+    if (trendSell) sellSignals.push('Tendência de Baixa (Abaixo EMA200)');
+
+    // 4.1 EMA Short Term Trend
+    const shortTrendBuy = lastPrice > lastEMA200 && lastPrice > ema20[ema20.length - 1];
+    const shortTrendSell = lastPrice < lastEMA200 && lastPrice < ema20[ema20.length - 1];
+    if (shortTrendBuy) buySignals.push('Preço acima da EMA20');
+    if (shortTrendSell) sellSignals.push('Preço abaixo da EMA20');
+
+    // 4.2 EMA Crossover (Golden/Death Cross)
+    const emaCrossBuy = ema20[ema20.length - 1] > ema50[ema50.length - 1];
+    const emaCrossSell = ema20[ema20.length - 1] < ema50[ema50.length - 1];
+    if (emaCrossBuy) buySignals.push('Cruzamento EMA 20/50 (Alta)');
+    if (emaCrossSell) sellSignals.push('Cruzamento EMA 20/50 (Baixa)');
+
+    // 5. Stochastic RSI (Momentum)
+    const stochBuy = lastStoch.k < 20;
+    const stochSell = lastStoch.k > 80;
+    if (stochBuy) buySignals.push(`StochRSI Sobrevendido (${lastStoch.k.toFixed(2)})`);
+    if (stochSell) buySignals.push(`StochRSI Sobrecomprado (${lastStoch.k.toFixed(2)})`);
+
+    // 6. ADX (Trend Strength)
+    const adxStrong = lastADX.adx > 20;
+    if (adxStrong) {
+      // ADX reforça a tendência atual
+      if (trendBuy) buySignals.push(`Tendência Forte (ADX ${lastADX.adx.toFixed(2)})`);
+      if (trendSell) sellSignals.push(`Tendência Forte (ADX ${lastADX.adx.toFixed(2)})`);
+    }
+
+    // 7. MFI (Volume Flow)
+    const mfiBuy = lastMFI < 20;
+    const mfiSell = lastMFI > 80;
+    if (mfiBuy) buySignals.push(`MFI Sobrevendido (${lastMFI.toFixed(2)})`);
+    if (mfiSell) sellSignals.push(`MFI Sobrecomprado (${lastMFI.toFixed(2)})`);
+
+
+    // --- Lógica da Estratégia Selecionada ---
+
+    let requiredConfluences = 0;
+    let strategyName = '';
+
+    // Define o número de confluências necessárias baseado na estratégia
+    switch (strategyId) {
+      case 1:
+        requiredConfluences = 2;
+        strategyName = 'Estratégia 1 (2 Confluências)';
         break;
-
-      case 'trend_surfer':
-        // Estratégia 3: Trend Surfer (EMA Cross + Trend Filter + ADX)
-        // Compra: EMA9 > EMA21 + Preço > EMA200 + ADX > 25
-        if (lastEMA9 > lastEMA21 && lastPrice > lastEMA200 && lastADX.adx > 25) {
-          signals.push('Cruzamento EMA9/21 Alta + Tendência Primária Alta + ADX Forte');
-          confidence = 90;
-          direction = 'up';
-        }
-        // Venda: EMA9 < EMA21 + Preço < EMA200 + ADX > 25
-        else if (lastEMA9 < lastEMA21 && lastPrice < lastEMA200 && lastADX.adx > 25) {
-          signals.push('Cruzamento EMA9/21 Baixa + Tendência Primária Baixa + ADX Forte');
-          confidence = 90;
-          direction = 'down';
-        }
+      case 2:
+        requiredConfluences = 3;
+        strategyName = 'Estratégia 2 (3 Confluências)';
         break;
-
-      case 'cci_reversal':
-        // Estratégia 4: CCI Reversal
-        // Compra: CCI < -100 (Oversold) e cruzando para cima
-        if (lastCCI < -100 && cci[cci.length - 2] < lastCCI) {
-          signals.push('CCI Oversold Reversal');
-          confidence = 80;
-          direction = 'up';
-        }
-        // Venda: CCI > 100 (Overbought) e cruzando para baixo
-        else if (lastCCI > 100 && cci[cci.length - 2] > lastCCI) {
-          signals.push('CCI Overbought Reversal');
-          confidence = 80;
-          direction = 'down';
-        }
+      case 3:
+        requiredConfluences = 4;
+        strategyName = 'Estratégia 3 (4 Confluências)';
         break;
-
-      case 'williams_r':
-        // Estratégia 5: Williams %R
-        // Compra: %R < -80 (Oversold) e começando a subir
-        if (lastWilliamsR < -80 && lastWilliamsR > williamsR[williamsR.length - 2]) {
-          signals.push('Williams %R Oversold Reversal');
-          confidence = 82;
-          direction = 'up';
-        }
-        // Venda: %R > -20 (Overbought) e começando a cair
-        else if (lastWilliamsR > -20 && lastWilliamsR < williamsR[williamsR.length - 2]) {
-          signals.push('Williams %R Overbought Reversal');
-          confidence = 82;
-          direction = 'down';
-        }
+      case 4:
+        requiredConfluences = 5;
+        strategyName = 'Estratégia 4 (5 Confluências)';
         break;
-
-      case 'mfi_reversal':
-        // Estratégia 6: MFI Reversal (Money Flow Index)
-        // Compra: MFI < 20 (Oversold)
-        if (lastMFI < 20) {
-          signals.push('MFI Oversold (Fluxo de dinheiro entrando)');
-          confidence = 85;
-          direction = 'up';
-        }
-        // Venda: MFI > 80 (Overbought)
-        else if (lastMFI > 80) {
-          signals.push('MFI Overbought (Fluxo de dinheiro saindo)');
-          confidence = 85;
-          direction = 'down';
-        }
+      case 5:
+        requiredConfluences = 6;
+        strategyName = 'Estratégia 5 (6 Confluências)';
         break;
-
-      case 'protocolo_v4':
+      case 6:
+        requiredConfluences = 7;
+        strategyName = 'Estratégia 6 (7 Confluências)';
+        break;
       default:
-        // Estratégia 1: Protocolo V4 (Mean Reversion + Trend Filter)
-        // Compra: Preço toca banda inferior + RSI < 30 + StochRSI < 20 + Preço > EMA200 (Pullback na tendência de alta)
-        if (lastPrice <= lastBB.lower && lastRSI < 30 && lastStochRSI.k < 20 && lastPrice > lastEMA200) {
-          signals.push('Reversão em Suporte (BB Inferior) + Sobrevenda Extrema + Tendência Primária Alta');
-          confidence = 90;
-          direction = 'up';
-        }
-        // Venda: Preço toca banda superior + RSI > 70 + StochRSI > 80 + Preço < EMA200 (Pullback na tendência de baixa)
-        else if (lastPrice >= lastBB.upper && lastRSI > 70 && lastStochRSI.k > 80 && lastPrice < lastEMA200) {
-          signals.push('Reversão em Resistência (BB Superior) + Sobrecompra Extrema + Tendência Primária Baixa');
-          confidence = 90;
-          direction = 'down';
-        }
-        // Condições secundárias (menos confiança, mas ainda com filtro de tendência)
-        else if (lastPrice <= lastBB.lower && lastRSI < 40 && lastPrice > lastEMA100) {
-          signals.push('Toque Banda Inferior + RSI Baixo + Tendência Média Alta');
-          confidence = 70;
-          direction = 'up';
-        } else if (lastPrice >= lastBB.upper && lastRSI > 60 && lastPrice < lastEMA100) {
-          signals.push('Toque Banda Superior + RSI Alto + Tendência Média Baixa');
-          confidence = 70;
-          direction = 'down';
-        }
-        break;
+        requiredConfluences = 2;
+        strategyName = 'Estratégia Padrão';
     }
 
-    // Análise de Suporte e Resistência (Reforço)
-    const nearestSupport = supportResistanceLevels
-      .filter(level => level.type === 'support' && level.price < lastPrice)
-      .sort((a, b) => b.price - a.price)[0];
+    // Verifica se atingiu o número necessário de confluências
+    let activeConfluences: string[] = [];
 
-    const nearestResistance = supportResistanceLevels
-      .filter(level => level.type === 'resistance' && level.price > lastPrice)
-      .sort((a, b) => a.price - b.price)[0];
-
-    if (nearestSupport) {
-      const distanceToSupport = ((lastPrice - nearestSupport.price) / lastPrice) * 100;
-      if (distanceToSupport < 0.5 && direction === 'up') {
-        signals.push(`Confirmação: Próximo ao suporte (${nearestSupport.price.toFixed(2)})`);
-        confidence += 5;
-      }
+    if (buySignals.length >= requiredConfluences) {
+      direction = 'up';
+      activeConfluences = buySignals;
+    } else if (sellSignals.length >= requiredConfluences) {
+      direction = 'down';
+      activeConfluences = sellSignals;
     }
 
-    if (nearestResistance) {
-      const distanceToResistance = ((nearestResistance.price - lastPrice) / lastPrice) * 100;
-      if (distanceToResistance < 0.5 && direction === 'down') {
-        signals.push(`Confirmação: Próximo à resistência (${nearestResistance.price.toFixed(2)})`);
-        confidence += 5;
-      }
+    // Cálculo de Confiança
+    let confidence = 0;
+    if (direction !== 'neutral') {
+      // Base: (Confluências Encontradas / Necessárias) * 100
+      // Ex: 3 encontradas / 2 necessárias = 150% -> cap em 99%
+      const count = direction === 'up' ? buySignals.length : sellSignals.length;
+      confidence = Math.min((count / requiredConfluences) * 100, 99);
+
+      // Garante que se atingiu o mínimo, a confiança é pelo menos 80%
+      if (confidence < 80) confidence = 80;
     }
+
+    console.log(`📊 Análise: ${strategyName} | Req: ${requiredConfluences} | Buy: ${buySignals.length} | Sell: ${sellSignals.length} | Conf: ${confidence.toFixed(1)}%`);
 
     return {
-      confidence: Math.min(confidence, 99),
-      signals,
+      confidence,
+      signals: activeConfluences, // Retorna a lista de confluências ativas
       direction,
+      strategyName,
       indicators: {
         rsiValues: rsi,
         macd: macd,
         ema20,
         ema50,
-        ema100,
         ema200,
         bollingerBands: bb,
         stochRsi,
-        adx
+        adx,
+        mfi
       },
       levels: {
-        pivotPoints,
-        supportResistance: supportResistanceLevels
+        pivotPoints: calculatePivotPoints(lastCandle.high, lastCandle.low, lastCandle.close),
+        supportResistance: findSupportResistanceLevels(data)
       }
     };
+
   } catch (error) {
     console.error('Analysis error:', error);
     throw error instanceof Error ? error : new Error('Falha na análise técnica');

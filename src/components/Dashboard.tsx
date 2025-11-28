@@ -104,12 +104,12 @@ export const Dashboard: React.FC = () => {
   }, [currentSignal]);
 
   const strategies = [
-    { id: 'protocolo_v4', name: 'Protocolo V4', desc: 'BB + EMA100 + EMA20 + RSI' },
-    { id: 'momentum_alpha', name: 'Momentum Alpha', desc: 'MACD + StochRSI' },
-    { id: 'trend_surfer', name: 'Trend Surfer', desc: 'ADX + EMA Cross' },
-    { id: 'cci_reversal', name: 'CCI Reversal', desc: 'CCI Oversold/Overbought' },
-    { id: 'williams_r', name: 'Williams %R', desc: 'Williams %R Reversal' },
-    { id: 'mfi_reversal', name: 'MFI Reversal', desc: 'MFI Money Flow' }
+    { id: 'protocolo_v4', name: 'Estratégia 1', desc: '2 Confluências (RSI + BB)' },
+    { id: 'momentum_alpha', name: 'Estratégia 2', desc: '3 Confluências (+ MACD)' },
+    { id: 'trend_surfer', name: 'Estratégia 3', desc: '4 Confluências (+ Trend)' },
+    { id: 'cci_reversal', name: 'Estratégia 4', desc: '5 Confluências (+ Stoch)' },
+    { id: 'williams_r', name: 'Estratégia 5', desc: '6 Confluências (+ ADX)' },
+    { id: 'mfi_reversal', name: 'Estratégia 6', desc: '7 Confluências (+ MFI)' }
   ];
 
   return (
@@ -118,7 +118,6 @@ export const Dashboard: React.FC = () => {
       <SignalPopup
         isOpen={showSignalPopup}
         signal={currentSignal}
-        strategyId={selectedStrategy}
         onClose={() => {
           setShowSignalPopup(false);
           setCurrentSignal(null); // Limpa o sinal ao fechar

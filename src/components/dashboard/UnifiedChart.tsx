@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '../ui/Card';
 import { fetchMarketData } from '../../services/cryptoApi';
 import { analyzeMarket } from '../../utils/indicators';
+import { connectWebSocket, subscribeToTrades } from '../../services/websocketService';
 import { Loader2, TrendingUp } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -71,46 +72,42 @@ export const UnifiedChart: React.FC<Props> = ({ selectedPair, timeframe }) => {
     }
   }, [selectedPair, timeframe]);
 
-  // WebSocket para dados em tempo real (Binance)
+  // ... (imports remain the same, but I need to be careful not to duplicate imports if I replace the whole block)
+
+  // WebSocket para dados em tempo real (MyBroker)
   useEffect(() => {
-    let symbol = selectedPair.replace('/', '').toLowerCase();
-    // Mapeamento básico para pares comuns na Binance (USDT)
-    if (symbol.endsWith('usd')) {
-      symbol = symbol.replace('usd', 'usdt');
-    }
+    // Conecta ao WebSocket para o par selecionado
+    const disconnect = connectWebSocket(selectedPair);
 
-    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol}@trade`);
-
-    ws.onmessage = (event) => {
+    // Inscreve para receber atualizações
+    const unsubscribe = subscribeToTrades((data) => {
       try {
-        const data = JSON.parse(event.data);
-        const price = parseFloat(data.p);
+        const price = typeof data.p === 'string' ? parseFloat(data.p) : data.p;
 
-        setRealtimePrice(price);
+        if (!isNaN(price)) {
+          setRealtimePrice(price);
 
-        // Atualiza o último ponto do gráfico em tempo real
-        setChartData((prev: any) => {
-          if (!prev || !prev.prices || prev.prices.length === 0) return prev;
+          // Atualiza o último ponto do gráfico em tempo real
+          setChartData((prev: any) => {
+            if (!prev || !prev.prices || prev.prices.length === 0) return prev;
 
-          const newPrices = [...prev.prices];
-          newPrices[newPrices.length - 1] = price;
+            const newPrices = [...prev.prices];
+            newPrices[newPrices.length - 1] = price;
 
-          return {
-            ...prev,
-            prices: newPrices
-          };
-        });
+            return {
+              ...prev,
+              prices: newPrices
+            };
+          });
+        }
       } catch (e) {
-        console.error('Error parsing WS data:', e);
+        console.error('Error processing WS data:', e);
       }
-    };
-
-    ws.onerror = (e) => {
-      console.error('WebSocket error:', e);
-    };
+    });
 
     return () => {
-      ws.close();
+      unsubscribe();
+      disconnect();
     };
   }, [selectedPair]);
 
